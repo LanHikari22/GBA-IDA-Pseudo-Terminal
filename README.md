@@ -12,5 +12,5 @@ This is a collection of tools that uses the IDAPython API to execute commands fo
 
 # Modules
 **dis** (Disassembly utils)
-- rng(start_ea, end_ea): This will disassemble from the specified range (if a function item is in the range, it will be disassembled). The disassembly is in a format compatible with the none-arm-eabi-gcc assembler.
-- rngext(start_ea, end_ea): This will scan all external references used in the specified range, and compute a list of `.equ`s for them
+- `rng(start_ea, end_ea)`: This will disassemble from the specified range (if a function item is in the range, it will be disassembled completely, even if it exceeds that range). The disassembly is in a format compatible with the none-arm-eabi-gcc assembler.
+- `rngext(start_ea, end_ea)`: This will scan all external references used in the specified range, and compute a list of `.equ`s for them
