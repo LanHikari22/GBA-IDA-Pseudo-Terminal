@@ -1,0 +1,5 @@
+# remove all pycharm stuff
+.idea/
+
+# no need to include compiled python files
+*.pyc
