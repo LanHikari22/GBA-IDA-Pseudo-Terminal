@@ -176,8 +176,8 @@ class Function:
     def getComment(self):
         # type: () -> str
         """
-        TODO: Sometimes the comment is repeatable (created through decomp) or not (created through disass).
-        What to return???? Why not whichever works?
+        Sometimes the comment is repeatable (created through decomp) or not (created through disass).
+        Returning disass comment
         """
         cmt = idc.get_func_cmt(self.func_ea, 1)
         if not cmt: cmt = idc.get_func_cmt(self.func_ea, 0)
@@ -186,9 +186,7 @@ class Function:
     def setComment(self, cmt):
         # type: (str) -> ()
         """
-        TODO: repeatable or not???
         :param cmt: Comment to be set as a function comment
-        :return:
         """
         idaapi.set_func_cmt(self.func, cmt, 1)
 
@@ -234,6 +232,7 @@ class Function:
         return output
 
     def getFormattedDisasm(self):
+        # type: () -> str
         """
         Gets the disassembly of the function by creating data elements of all
         its items, including its pool.
@@ -255,33 +254,3 @@ class Function:
             ea = ea + d.getSize()
         disasm += "// end of function %s" % self.getName()
         return disasm
-
-
-
-
-def printRefs(crefs, drefs):
-    s = ''
-    s += '['
-    for ref in crefs:
-        s += str(hex(ref)) + ', '
-    s = (len(s) > 8) and s[0:-2] + '] ' or s + '] '
-    len1 = len(s)
-
-    s += '['
-    for ref in drefs:
-        s += str(hex(ref)) + ', '
-    s = (len(s) - len1 > 8) and s[0:-2] + '] ' or s + '] '
-
-    print(s)
-
-
-def RunTesting():
-    func = Function(idc.here())
-    print(func.getComment())
-    func.enumerateCrossReferences()
-    # crefs, drefs = func.ongoing_getXRefsFrom()
-    # printRefs(crefs, drefs)
-
-
-if __name__ == '__main__':
-    RunTesting()
