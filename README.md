@@ -1,2 +1,16 @@
-# GBA-IDA-Disassembly-Tools
-IDAPython tools to aid with disassembly extraction from IDA, tailored at the GBA architecture at some parts
+# GBA-IDA-Pseudo-Terminal
+This is a collection of tools that uses the IDAPython API to execute commands for IDB analysis, data exportion, or database manipulation
+
+# Usage
+Run pt.py as a script in python, if successful, the echo command should run with a message in the python output window.
+To view the list of commands (and modules containing commands), execute `pt.help` in the python output window.
+To execute a command, run it like a function: `pt.echo("beep beep!")`. You can also view its docs: `pt.echo.help`.
+There are modules inside pt that are clearly distinguished from commands when executing `pt.help`.
+To access them, simply refer to the from pt: `pt.dis.rng(0x8000000, 0x80000200)`. 
+The module can also display its list of commands and modules: `pt.dis.help`.
+The general rule is, every module and command should have the member help associated with it. use help on a command for maximum detail.
+
+# Modules
+**dis** (Disassembly utils)
+- rng(start_ea, end_ea): This will disassemble from the specified range.
+- rngext(start_ea, end_ea): This will scan all external references to the specified range, and compute a list of `.equ`s for them
