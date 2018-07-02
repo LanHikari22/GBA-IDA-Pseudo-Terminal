@@ -7,7 +7,7 @@ from IDAItems import Function, Data
 
 idaapi.require("PseudoTerminal.TerminalModule")
 
-from PseudoTerminal import TerminalModule, miscUtils
+import TerminalModule, miscUtils
 
 
 class dis(TerminalModule.TerminalModule, object):
