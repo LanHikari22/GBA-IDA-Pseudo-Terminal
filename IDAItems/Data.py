@@ -545,7 +545,7 @@ class Data:
                 pool_ea = xrefsFrom[1][0]
             else:
                 pool_ea = xrefsFrom[1][1]
-
+        print(pool_ea)
         contentData = Data(Data(pool_ea).getContent())
         if contentData.isPointer(contentData.ea):
             cmt = "=%s" % contentData.getName()
@@ -556,7 +556,7 @@ class Data:
         if arm:
             shift = 8
         else:
-            shift = 4
+            shift = 4 # TODO: i get out of word-alignment in thumb mode if i do by 4, pipeline only advanced by 1?
 
         return "%s%s%s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, (8-len(inst))*' ', reg,
                                                          pool_ea, self.ea, shift, cmt)
