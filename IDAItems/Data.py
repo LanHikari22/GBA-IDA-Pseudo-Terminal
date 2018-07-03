@@ -59,8 +59,7 @@ class Data:
 
     def getComment(self):
         """
-        updates the comment precomputed prameter and returns it
-        :return: data item comment, as last recorded by idaapi
+        :return: non-repeatable comment, prioritizes GUI-added comments over API added ones
         """
         return idc.get_cmt(self.ea, 0) or ''
 
@@ -305,8 +304,6 @@ class Data:
         comment = self.getComment()
         if comment:
             disasm += "  // " + comment
-            # end line
-            disasm += "\n"
 
         disasm = self._convertTabs(disasm)
         return disasm
@@ -516,8 +513,6 @@ class Data:
         :return: disassembly with the correct LDR/STR [PC, ...] format
         :raise: DataException if conversion is impossible
         """
-        # TODO: fails in cases like 08000150: LDR R2, =(dword_1E78+0x30)
-        # TODO: 080001A0 LDR R0, =GeneralLCDStatus_STAT_LYC_ gives =GeneralLCDStatus(STAT_LVC)?
 
         disasm = idc.GetDisasm(self.ea)
 

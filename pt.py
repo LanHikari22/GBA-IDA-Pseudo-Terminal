@@ -17,7 +17,12 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         self.echo = miscUtils.pt_echo
         self.echo.help = self.echo.__doc__
         self.echo.fmt = "<msg>"
-        self.help =  self._get_format("echo", self.echo) + '\n'
+        self.help += self._get_format("echo", self.echo) + '\n'
+
+        self.clear = miscUtils.pt_clear
+        self.clear.help = self.clear.__doc__
+        self.clear.fmt = ""
+        self.help += self._get_format("clear", self.clear) + '\n'
 
         self.plcv = miscUtils.pt_plcv
         self.plcv.help = self.plcv.__doc__

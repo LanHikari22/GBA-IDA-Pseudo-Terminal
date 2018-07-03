@@ -5,7 +5,7 @@ import idc
 
 from IDAItems import Function, Data
 
-idaapi.require("PseudoTerminal.TerminalModule")
+idaapi.require("TerminalModule")
 
 import TerminalModule, miscUtils
 
