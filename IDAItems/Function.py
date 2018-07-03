@@ -207,6 +207,9 @@ class Function:
             self._size = head - self.func.start_ea
             return self._size
 
+    def isThumb(self):
+        return idc.get_item_size(self.func_ea) == 2
+
     def getBoundaries(self):
         """
         :return: Tuple of Start address and end address of function
@@ -250,10 +253,10 @@ class Function:
         disasm = comment
 
         # specify  whether this is an arm or thumb function
-        if Data.Data(self.func_ea).getSize() == 4:
-            disasm += ".arm\n"
-        else:
+        if self.isThumb():
             disasm += ".thumb\n"
+        else:
+            disasm += ".arm\n"
 
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
