@@ -5,7 +5,7 @@ import idc
 
 from IDAItems import Function, Data
 
-idaapi.require("PseudoTerminal.TerminalModule")
+idaapi.require("TerminalModule")
 
 import TerminalModule, miscUtils
 
@@ -42,6 +42,7 @@ class dis(TerminalModule.TerminalModule, object):
         disasm = ''
         while ea < end_ea:
             if  Function.isFunction(ea):
+                print("[+]")
                 f = Function.Function(ea)
                 disasm += f.getFormattedDisasm() + "\n\n"
                 ea = ea + f.getSize(withPool=True)
