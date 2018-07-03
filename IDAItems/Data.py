@@ -304,8 +304,6 @@ class Data:
         comment = self.getComment()
         if comment:
             disasm += "  // " + comment
-            # end line
-            disasm += "\n"
 
         disasm = self._convertTabs(disasm)
         return disasm

@@ -42,7 +42,6 @@ class dis(TerminalModule.TerminalModule, object):
         disasm = ''
         while ea < end_ea:
             if  Function.isFunction(ea):
-                print("[+]")
                 f = Function.Function(ea)
                 disasm += f.getFormattedDisasm() + "\n\n"
                 ea = ea + f.getSize(withPool=True)

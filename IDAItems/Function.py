@@ -247,6 +247,7 @@ class Function:
             comment = ''
 
         disasm = comment
+        disasm += "@%s"
         while ea < self.func_ea + self.getSize(withPool=True):
             d = Data.Data(ea)
             disasm += d.getFormattedDisasm() + "\n"
