@@ -239,15 +239,23 @@ class Function:
         :return:
         """
         ea = self.func_ea
+
+        # spefiy function comment, if available
         # put // for function comment in each line
         if self.getComment():
             comment = self.getComment().replace("\n", "\n// ",
                                                 self.getComment().count("\n"))
         else:
             comment = ''
-
         disasm = comment
-        disasm += "@%s"
+
+        # specify  whether this is an arm or thumb function
+        if Data.Data(self.func_ea).getSize() == 4:
+            disasm += ".arm\n"
+        else:
+            disasm += ".thumb\n"
+
+        # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
             d = Data.Data(ea)
             disasm += d.getFormattedDisasm() + "\n"
