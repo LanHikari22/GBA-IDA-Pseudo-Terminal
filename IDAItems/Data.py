@@ -59,8 +59,7 @@ class Data:
 
     def getComment(self):
         """
-        updates the comment precomputed prameter and returns it
-        :return: data item comment, as last recorded by idaapi
+        :return: non-repeatable comment, prioritizes GUI-added comments over API added ones
         """
         return idc.get_cmt(self.ea, 0) or ''
 
@@ -305,8 +304,6 @@ class Data:
         comment = self.getComment()
         if comment:
             disasm += "  // " + comment
-            # end line
-            disasm += "\n"
 
         disasm = self._convertTabs(disasm)
         return disasm
@@ -516,8 +513,6 @@ class Data:
         :return: disassembly with the correct LDR/STR [PC, ...] format
         :raise: DataException if conversion is impossible
         """
-        # TODO: fails in cases like 08000150: LDR R2, =(dword_1E78+0x30)
-        # TODO: 080001A0 LDR R0, =GeneralLCDStatus_STAT_LYC_ gives =GeneralLCDStatus(STAT_LVC)?
 
         disasm = idc.GetDisasm(self.ea)
 
@@ -540,7 +535,7 @@ class Data:
         # there must be xrefs, LDR/STR must not be register relative
         xrefsFrom = self.getXRefsFrom()
         if not len(xrefsFrom[1]):
-            raise(DataException('attempt to convert pool in non-pool inst'))
+            raise(DataException('%07X: attempt to convert pool in non-pool inst' % self.ea))
 
         # sometimes, xrefsFrom point to both content_ra and pool_ea. order is inconsistent
         pool_ea = xrefsFrom[1][0]
@@ -551,7 +546,13 @@ class Data:
             else:
                 pool_ea = xrefsFrom[1][1]
 
-        contentData = Data(Data(pool_ea).getContent())
+        # confirm that the content being loaded is an int. can't load anything else to a register!
+        content = Data(pool_ea).getContent()
+        if type(content) != int:
+            raise(DataException("%07X: attempt to load non-int to register" % pool_ea))
+
+        # write the actual pool value being loaded for readability
+        contentData = Data(content)
         if contentData.isPointer(contentData.ea):
             cmt = "=%s" % contentData.getName()
         else:
@@ -561,7 +562,13 @@ class Data:
         if arm:
             shift = 8
         else:
-            shift = 4
+            # this is more complicated since it can be word unaligned
+            if (pool_ea - self.ea - 4) % 4 != 0:
+                # to achieve word alignment, we round down to the last word aligned value
+                shift = 2
+            else:
+                # normal case, PC is 2 instructions ahead
+                shift = 4
 
         return "%s%s%s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, (8-len(inst))*' ', reg,
                                                          pool_ea, self.ea, shift, cmt)

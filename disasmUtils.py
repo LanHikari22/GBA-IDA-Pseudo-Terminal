@@ -1,12 +1,11 @@
 # @file disasmUtils
 # provides utility commands for disassembling
 import idaapi
+idaapi.require("IDAItems.Data")
+idaapi.require("IDAItems.Function")
+idaapi.require("TerminalModule")
 import idc
-
 from IDAItems import Function, Data
-
-idaapi.require("PseudoTerminal.TerminalModule")
-
 import TerminalModule, miscUtils
 
 

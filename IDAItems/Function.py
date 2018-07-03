@@ -176,8 +176,8 @@ class Function:
     def getComment(self):
         # type: () -> str
         """
-        TODO: Sometimes the comment is repeatable (created through decomp) or not (created through disass).
-        What to return???? Why not whichever works?
+        Sometimes the comment is repeatable (created through decomp) or not (created through disass).
+        Returning disass comment
         """
         cmt = idc.get_func_cmt(self.func_ea, 1)
         if not cmt: cmt = idc.get_func_cmt(self.func_ea, 0)
@@ -186,9 +186,7 @@ class Function:
     def setComment(self, cmt):
         # type: (str) -> ()
         """
-        TODO: repeatable or not???
         :param cmt: Comment to be set as a function comment
-        :return:
         """
         idaapi.set_func_cmt(self.func, cmt, 1)
 
@@ -234,20 +232,30 @@ class Function:
         return output
 
     def getFormattedDisasm(self):
+        # type: () -> str
         """
         Gets the disassembly of the function by creating data elements of all
         its items, including its pool.
         :return:
         """
         ea = self.func_ea
+
+        # spefiy function comment, if available
         # put // for function comment in each line
         if self.getComment():
             comment = self.getComment().replace("\n", "\n// ",
                                                 self.getComment().count("\n"))
         else:
             comment = ''
-
         disasm = comment
+
+        # specify  whether this is an arm or thumb function
+        if Data.Data(self.func_ea).getSize() == 4:
+            disasm += ".arm\n"
+        else:
+            disasm += ".thumb\n"
+
+        # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
             d = Data.Data(ea)
             disasm += d.getFormattedDisasm() + "\n"
@@ -255,33 +263,3 @@ class Function:
             ea = ea + d.getSize()
         disasm += "// end of function %s" % self.getName()
         return disasm
-
-
-
-
-def printRefs(crefs, drefs):
-    s = ''
-    s += '['
-    for ref in crefs:
-        s += str(hex(ref)) + ', '
-    s = (len(s) > 8) and s[0:-2] + '] ' or s + '] '
-    len1 = len(s)
-
-    s += '['
-    for ref in drefs:
-        s += str(hex(ref)) + ', '
-    s = (len(s) - len1 > 8) and s[0:-2] + '] ' or s + '] '
-
-    print(s)
-
-
-def RunTesting():
-    func = Function(idc.here())
-    print(func.getComment())
-    func.enumerateCrossReferences()
-    # crefs, drefs = func.ongoing_getXRefsFrom()
-    # printRefs(crefs, drefs)
-
-
-if __name__ == '__main__':
-    RunTesting()

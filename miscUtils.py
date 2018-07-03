@@ -12,6 +12,12 @@ def pt_echo(msg):
     """
     print(msg)
 
+def pt_clear():
+    """
+    prints 32 new lines
+    """
+    for i in range(32): print('')
+
 def pt_plcv(ea):
     # type: (ea, bool) -> str
     """
