@@ -263,7 +263,13 @@ class Data:
         flags = idc.GetFlags(self.ea)
         if idc.isStruct(flags):
             disasm = "INVALID"
+        elif idc.isAlign(flags):
+            # ALIGN <num> -> .align <num>
+            disasm = idc.GetDisasm(self.ea)
+            disasm = disasm.lower()
+            disasm = '.' + disasm
         elif idc.isData(flags):
+            if(idc.isAlign(flags)): raise(DataException("yup!"))
             disasm = self._getDataDisasm(self.ea)
         else:
             disasm = idc.GetDisasm(self.ea)
@@ -357,9 +363,12 @@ class Data:
         if idc.isCode(flags):
             # some instructions take no operands, like NOP
             instName = disasm[:disasm.index(' ')] if ' ' in disasm else disasm
-            if instName[-1] == 'S':
-                # remove the 'S': 'MOVS ...' -> 'MOV  ...'
-                output = instName[:-1] + ' ' + output[len(instName):]
+
+            # if the instruction is THUMB, it cannot have an 'S' in it...
+            if self.getSize() == 2 and instName[-1] == 'S':
+                output = instName[:-1] + ' ' + output[len(instName):].lstrip()
+                instName = instName[:-1]
+
             # adjust instruction spacing
             output = instName + (8 - len(instName))*' ' + output[len(instName):].lstrip()
 
