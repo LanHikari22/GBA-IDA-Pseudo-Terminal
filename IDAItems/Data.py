@@ -642,8 +642,11 @@ class Data:
         :return: filtered disasembly
         """
         # type: (str) -> str
-        words = list(filter(None, re.split('[ \t=]', disasm)))
+        words = list(filter(None, re.split('[ \t//]', disasm)))
         for word in words:
+            # special case, do not filter pool comments/names
+            if word[0] == '=':
+                continue
             # lower the word in the disasm if it's not a name
             if idc.get_name_ea(self.ea, word) == 0xffffffffL:
                 disasm = disasm.replace(word, word.lower())
