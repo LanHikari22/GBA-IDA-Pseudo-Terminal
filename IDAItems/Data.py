@@ -287,6 +287,8 @@ class Data:
             disasm = self._convertData(disasm)
         if idc.isCode(flags):
             disasm = self._convertCode(self.ea, disasm)
+            # make code small case
+            disasm = self._lowerCode(disasm)
         disasm = self._convertTabs(disasm)
         return disasm
 
@@ -369,8 +371,8 @@ class Data:
                 output = instName[:-1] + ' ' + output[len(instName):].lstrip()
                 instName = instName[:-1]
 
-            # adjust instruction spacing
-            output = instName + (8 - len(instName))*' ' + output[len(instName):].lstrip()
+            # adjust instruction spacing TODO: tabs or pads for instruction?
+            output = instName + (6-len(instName))*' ' + output[len(instName):].lstrip()
 
             # if the instruction is a pool instruction, the format should be changed
             try:
@@ -386,7 +388,6 @@ class Data:
         """
         name = self.getName() and self.getName() + ':\n' or ''
         return self.getFormattedDisasm()
-        return name + '\t' + self.getDisasm()
 
     def _getFlags(self):
         return idc.GetFlags(self.ea)
@@ -578,8 +579,8 @@ class Data:
             else:
                 # normal case, PC is 2 instructions ahead
                 shift = 4
-
-        return "%s%s%s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, (8-len(inst))*' ', reg,
+        # TODO: tabs or pads for instructions?
+        return "%s%s%s [PC, #0x%07X-0x%07X-%d] // %s" % (inst , (6-len(inst))*' ', reg,
                                                          pool_ea, self.ea, shift, cmt)
 
     def _isFunctionPointer(self, firstLineSplitDisasm):
@@ -631,5 +632,21 @@ class Data:
 
     def _convertTabs(self, disasm):
         # convert tabs to spaces
-        disasm = disasm.replace('\t', '  ', disasm.count('\t'))
+        disasm = disasm.replace('\t', '    ', disasm.count('\t'))
+        return disasm
+
+    def _lowerCode(self, disasm):
+        """
+        converts code to lower case except for names (like testFUNC in BL testFUNC)
+        :param disasm: disassembly to filter
+        :return: filtered disasembly
+        """
+        # type: (str) -> str
+        words = list(filter(None, re.split('[ \t=]', disasm)))
+        for word in words:
+            # lower the word in the disasm if it's not a name
+            if idc.get_name_ea(self.ea, word) == 0xffffffffL:
+                disasm = disasm.replace(word, word.lower())
+
+
         return disasm
