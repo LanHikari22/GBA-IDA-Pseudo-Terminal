@@ -215,7 +215,7 @@ class Function:
         """
         output = False
         ea = self.func_ea
-        while ea < self.getSize():
+        while ea < self.func_ea + self.getSize():
             size = idc.get_item_size(ea)
             if size == 2:
                 output = True
@@ -257,20 +257,21 @@ class Function:
         """
         ea = self.func_ea
 
+        # specify  whether this is an arm or thumb function
+        if self.isThumb():
+            disasm = ".thumb\n"
+        else:
+            disasm = ".arm\n"
+
+
         # spefiy function comment, if available
         # put // for function comment in each line
         if self.getComment():
-            comment = self.getComment().replace("\n", "\n// ",
-                                                self.getComment().count("\n"))
+            comment = '// ' + self.getComment().replace('\n', '\n// ',
+                                                self.getComment().count("\n")) + '\n'
         else:
             comment = ''
-        disasm = comment
-
-        # specify  whether this is an arm or thumb function
-        if self.isThumb():
-            disasm += ".thumb\n"
-        else:
-            disasm += ".arm\n"
+        disasm += comment
 
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
