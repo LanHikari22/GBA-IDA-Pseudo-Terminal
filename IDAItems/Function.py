@@ -208,7 +208,21 @@ class Function:
             return self._size
 
     def isThumb(self):
-        return idc.get_item_size(self.func_ea) == 2
+        """
+        A thumb function must contain at least one thumb instruction with the size of 2.
+        branch instructions are of size 4, although are still thumb.
+        :return:
+        """
+        output = False
+        ea = self.func_ea
+        while ea < self.getSize():
+            size = idc.get_item_size(ea)
+            if size == 2:
+                output = True
+                break
+            ea = ea + size
+        return output
+
 
     def getBoundaries(self):
         """

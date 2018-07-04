@@ -372,7 +372,7 @@ class Data:
                 instName = instName[:-1]
 
             # adjust instruction spacing TODO: tabs or pads for instruction?
-            output = instName + (6-len(instName))*' ' + output[len(instName):].lstrip()
+            output = instName + ' ' + output[len(instName):].lstrip()
 
             # if the instruction is a pool instruction, the format should be changed
             try:
@@ -580,8 +580,8 @@ class Data:
                 # normal case, PC is 2 instructions ahead
                 shift = 4
         # TODO: tabs or pads for instructions?
-        return "%s%s%s [PC, #0x%07X-0x%07X-%d] // %s" % (inst , (6-len(inst))*' ', reg,
-                                                         pool_ea, self.ea, shift, cmt)
+        return "%s %s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, reg,
+                                                        pool_ea, self.ea, shift, cmt)
 
     def _isFunctionPointer(self, firstLineSplitDisasm):
         """
