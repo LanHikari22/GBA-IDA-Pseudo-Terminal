@@ -27,7 +27,7 @@ class dis(TerminalModule.TerminalModule, object):
 
 
     @staticmethod
-    def rng(start_ea, end_ea):
+    def rng(start_ea, end_ea, debug=False):
         # type: (int, int) -> str
         """
         disassembles all data elements within a range
@@ -42,10 +42,12 @@ class dis(TerminalModule.TerminalModule, object):
         while ea < end_ea:
             if  Function.isFunction(ea):
                 f = Function.Function(ea)
+                if debug: print("%07X: disass function %s @ %07X" % (ea, f.getName(), f.func_ea))
                 disasm += f.getFormattedDisasm() + "\n\n"
                 ea = ea + f.getSize(withPool=True)
             else:
                 d = Data.Data(ea)
+                if debug: print("%07X: disass data %s @ %07X" % (ea, d.getName(), d.ea))
                 disasm += d.getFormattedDisasm() + "\n"
                 ea = ea + d.getSize()
         return disasm

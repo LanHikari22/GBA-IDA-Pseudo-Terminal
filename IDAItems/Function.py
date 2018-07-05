@@ -37,6 +37,11 @@ class Function:
 
             self.func = idaapi.get_func(func_ea)
             self.func_ea = self.func.startEA
+
+            # TODO: these shouldn't be unsupported. detect each chunk as its own function? fix func_ea
+            # function chunks can give invalid behavior when definind functions!
+            if self.func.tails:
+                raise (FunctionException("%07X: Function Chunks are not supported" % func_ea))
         else:
             raise (FunctionException("Address %08x does not live within a function" % func_ea))
 
