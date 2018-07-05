@@ -10,7 +10,4 @@ This is a collection of tools that uses the IDAPython API to execute commands fo
 - The module can also display its list of commands and modules: `pt.dis.help`.
 - The general rule is, every module and command should have the member help defined in it. Use help on a command for maximum detail.
 
-# Modules
-**dis** (Disassembly utils)
-- `rng(start_ea, end_ea)` This will disassemble from the specified range (if a function item is in the range, it will be disassembled completely, even if it exceeds that range). The disassembly is in a format compatible with the none-arm-eabi-gcc assembler.
-- `rngext(start_ea, end_ea)` This will scan all external references used in the specified range, and compute a list of `.equ`s for them
+To view the documentation for commands, see [COMMANDS.md](COMMANDS.md).
