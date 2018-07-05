@@ -525,7 +525,7 @@ class Data:
         disasm = idc.GetDisasm(self.ea)
 
         # must be a load or store
-        if "LDR" not in disasm and "STR" not in disasm:
+        if "LDR" not in disasm:
             raise(DataException('attempt to convert pool in non-pool inst'))
 
         # retrieve the instrution and register used
@@ -533,8 +533,8 @@ class Data:
         no_inst_disasm = disasm[len(inst):].lstrip()
         reg = no_inst_disasm[:no_inst_disasm.index(' ')]
 
-        # must only contain contain one register. ex. LDR R0=0xDEADBEEF
-        if no_inst_disasm.count('R') > 1:
+        # it's not a pool instruction if it ends with ']' (ldr r0, [r1] vs ldr r0, =beep)
+        if disasm[-1] == ']':
             raise(DataException('attempt to convert pool in non-pool inst'))
 
         # determine whether it's arm or thumb
@@ -580,7 +580,6 @@ class Data:
         # TODO: tabs or pads for instructions?
         return "%s %s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, reg,
                                                         pool_ea, self.ea, shift, cmt)
-
 
     def _isFunctionPointer(self, firstLineSplitDisasm):
         """
@@ -643,13 +642,14 @@ class Data:
         """
         # type: (str) -> str
         words = list(filter(None, re.split('[ \t//]', disasm)))
+
         for word in words:
             # special case, do not filter pool comments/names
             if word[0] == '=':
                 continue
             # lower the word in the disasm if it's not a name
             if idc.get_name_ea(self.ea, word) == 0xffffffffL:
-                disasm = disasm.replace(word, word.lower())
+                disasm = disasm.replace(word, word.lower(), 1)
 
 
         return disasm

@@ -1,8 +1,8 @@
 import idaapi
+idaapi.require("IDAItems.Data")
 
 from Definitions import Architecture, Paths
 from IDAItems import Data
-idaapi.require("IDAItems.Data")
 
 def pt_echo(msg):
     # type: (str) -> None
@@ -28,10 +28,7 @@ def pt_plcv(ea):
     :return: string with the correct [PC, ...] format
     """
     d = Data.Data(ea)
-    try:
-        disasm = d._getPoolDisasm()
-    except(Data.DataException):
-        disasm = "N\A"
+    disasm = d._getPoolDisasm()
     return disasm
 
 def pt_xrefs2str(xrefs):
