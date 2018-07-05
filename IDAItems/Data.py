@@ -264,12 +264,8 @@ class Data:
         if idc.isStruct(flags):
             disasm = "INVALID"
         elif idc.isAlign(flags):
-            # ALIGN <num> -> .align <num>
             disasm = idc.GetDisasm(self.ea)
-            disasm = disasm.lower()
-            disasm = '.' + disasm
         elif idc.isData(flags):
-            if(idc.isAlign(flags)): raise(DataException("yup!"))
             disasm = self._getDataDisasm(self.ea)
         else:
             disasm = idc.GetDisasm(self.ea)
@@ -283,9 +279,11 @@ class Data:
         """
         disasm = self.getOrigDisasm()
         flags = idc.GetFlags(self.ea)
-        if idc.isData(flags) or idc.isUnknown(flags):
+        if idc.isAlign(flags):
+            disasm = self._convertAlignDisasm(disasm)
+        elif idc.isData(flags) or idc.isUnknown(flags):
             disasm = self._convertData(disasm)
-        if idc.isCode(flags):
+        elif idc.isCode(flags):
             disasm = self._convertCode(self.ea, disasm)
             # make code small case
             disasm = self._lowerCode(disasm)
@@ -583,6 +581,7 @@ class Data:
         return "%s %s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, reg,
                                                         pool_ea, self.ea, shift, cmt)
 
+
     def _isFunctionPointer(self, firstLineSplitDisasm):
         """
         Identifies the construct 'DCD <funcName>' as a function pointer entry!
@@ -636,6 +635,7 @@ class Data:
         return disasm
 
     def _lowerCode(self, disasm):
+        # type: (str) -> str
         """
         converts code to lower case except for names (like testFUNC in BL testFUNC)
         :param disasm: disassembly to filter
@@ -651,5 +651,68 @@ class Data:
             if idc.get_name_ea(self.ea, word) == 0xffffffffL:
                 disasm = disasm.replace(word, word.lower())
 
+
+        return disasm
+
+    def _convertAlignDisasm(self, disasm):
+        # type: (str) -> str
+        """
+        converts ALIGN <n> to a consistent equivalent compatible with GNU assembler standards
+        ALIGN <n> -> .balign <n>, 0x00
+        This tells the assembler to pad with zeros, and to align to an address divisible by n
+        :param disasm: align disassembly to convert
+        :return: the converted disassembly
+        """
+        words = list(filter(None, re.split('[ \t]', disasm)))
+        # nothing to convert
+        if words[0] != "ALIGN":
+            return disasm
+
+        # obtain n from ALIGN <n>
+        if "0x" in words[1]:
+            n = int(words[1], 16)
+        else:
+            n = int(words[1])
+
+        # TODO: ALIGN <n> for n >= 8 seems to modify data before it. Why??
+        if n <= 4:
+            disasm = ".balign %s, 0x00" % words[1]
+        else:
+            # compute as .word and .byte instead.
+            remainingBytes = n - (self.ea % n)
+
+            disasm = ''
+            # pad with words
+            wordPadded = False
+            if remainingBytes > 4:
+                disasm += '.word '
+            while remainingBytes > 4:
+                if not wordPadded:
+                    wordPadded = True
+                disasm += '0, '
+                remainingBytes -= 4
+            # remove trailing ", " if it exists
+            if wordPadded:
+                disasm = disasm[:-2]
+
+            # pad with bytes
+            bytePadded = False
+            if remainingBytes > 0:
+                # in case both word padding and byte padding is needed, format that right
+                if wordPadded:
+                    disasm += '\n\t.byte '
+                else:
+                    disasm += '.byte '
+            while remainingBytes > 0:
+                if not bytePadded:
+                    bytePadded = True
+                # we have word padded, in case we byte pad too
+                if not wordPadded:
+                    wordPadded = True
+                disasm += '0, '
+                remainingBytes -= 1
+            # remove trailing ", " if it exists
+            if bytePadded:
+                disasm = disasm[:-2]
 
         return disasm

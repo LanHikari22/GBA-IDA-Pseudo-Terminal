@@ -217,7 +217,7 @@ class Function:
         ea = self.func_ea
         while ea < self.func_ea + self.getSize():
             size = idc.get_item_size(ea)
-            if size == 2:
+            if size == 2 and idc.isCode(idc.GetFlags(ea)):
                 output = True
                 break
             ea = ea + size
