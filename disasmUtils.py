@@ -17,13 +17,8 @@ class dis(TerminalModule.TerminalModule, object):
         """
         super(type(self), self).__init__('[+] dis (dissassembly utils)')
 
-        self.rng.help = self.rng.__doc__
-        self.rng.fmt = "<start_ea> <end_ea>"
-        self.help += self._get_format("rng", self.rng) + '\n'
-
-        self.rngext.help = self.rngext.__doc__
-        self.rngext.fmt = "<start_ea> <end_ea>"
-        self.help += self._get_format("rngext", self.rngext) + '\n'
+        self.registerCommand(self, self.rng, "rng", "<start_ea> <end_ea>")
+        self.registerCommand(self, self.rngext, "rngext", "<start_ea> <end_ea>")
 
 
     @staticmethod
@@ -89,6 +84,7 @@ class dis(TerminalModule.TerminalModule, object):
             # advance to next item
             ea = ea + d.getSize()
 
+        xrefs.sort()
 
         output = ''
         # output file formats to include symbols into linking process
@@ -99,3 +95,8 @@ class dis(TerminalModule.TerminalModule, object):
             output += '.equ %s, 0x%07X\n' % (name, xref)
 
         return output
+
+    def push(self, start_ea, end_ea):
+        # define command within module
+
+        print(self.push)

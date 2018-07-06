@@ -1,3 +1,9 @@
+import idaapi
+idaapi.require('Definitions.Environment')
+
+from Definitions import Environment
+
+
 class TerminalModule:
     def __init__(self, fmt):
         self.fmt = fmt
@@ -26,3 +32,28 @@ class TerminalModule:
         """
         return name + ' ' + func.fmt
 
+    @staticmethod
+    def registerCommand(module, cmdf, name, fmt):
+        """
+        Registers the command within the specified module, and assigns help and fmt members to it
+        :param module: the TerminalModule
+        :param cmdf: the command function within the module
+        :param name: the name of the command
+        :param fmt: the one-line summary of how to use the command
+        """
+        cmdf.help = cmdf.__doc__
+        cmdf.fmt = fmt
+        module.help += module._get_format(name, cmdf) + '\n'
+
+
+    @staticmethod
+    def get(key):
+        """
+        Gets the variable value from the vars class dictionary, if set
+        :param key: the variable to get from the Environment (Definitions/Environment)
+        :return: the value of the variable
+        """
+        if key in Environment.env:
+            return Environment.env[key]
+        else:
+            return None
