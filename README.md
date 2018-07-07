@@ -12,5 +12,7 @@ This is a collection of tools that uses the IDAPython API to execute commands fo
 - Every module and command should have docs and one-line summaries: `pt.help(pt.dis.rng)', `pt.fmt(pt.dis)`
 - Run `pt.clrenv()` then a series of `pt.env(key=val)` commands to fill them. (Not all utilities need environmental variables)
 - The necessary environmental variables to fill can be found in `Definition/Environment.py`
+- You may find it useful to create a simple python script file with the `pt.clrenv()` and `pt.env()` calls necessary to populate the environment for different projects. 
+- You cannot create new environmental variables, only populate existent ones.
 
 To view the documentation for commands, see [COMMANDS.md](COMMANDS.md).
