@@ -116,10 +116,15 @@ class dis(TerminalModule.TerminalModule, object):
             disasm = self.rng(asmFiles[file][0], asmFiles[file][1])
             externs = self.rngext(asmFiles[file][0], asmFiles[file][1])
             # write disassembly to file
-            asmfile = open(asmPath + file + '.s', 'w')
+            spath = asmPath + file + '.s'
+            print("Disassembling %s.s into %s... " % (file, spath))
+            asmfile = open(spath, 'w')
             asmfile.write(disasm)
             asmfile.close()
             # write externs to file
-            incfile = open(externsPath + file + '.inc', 'w')
+            incpath = externsPath + file + '.inc'
+            print("Defining external symbols for %s.s in %s..." % (file, incpath))
+            incfile = open(incpath, 'w')
             incfile.write(externs)
             incfile.close()
+        print("Push complete!")

@@ -76,4 +76,4 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
 
 if __name__ == '__main__':
     pt = PseudoTerminal()
-    pt.echo("beep beep!")
+    pt.echo("PseudoTerminal, ready for combat!")
