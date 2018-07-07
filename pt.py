@@ -26,6 +26,9 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         # __init__ of modules should set up things similarly to pt
         self.dis = disasmUtils.dis()
         self.registerHelp(self, self.help(self) + self.fmt(self.dis) + '\n')
+        self.misc = miscUtils.misc()
+        self.registerHelp(self, self.help(self) + self.fmt(self.misc) + '\n')
+
 
     @staticmethod
     def echo(msg):
@@ -76,4 +79,4 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
 
 if __name__ == '__main__':
     pt = PseudoTerminal()
-    pt.echo("beep beep!")
+    pt.echo("PseudoTerminal, ready for combat!")

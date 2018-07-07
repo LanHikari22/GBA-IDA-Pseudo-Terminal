@@ -2,11 +2,12 @@
 # @Author Lan
 # This module classifies a Data type and defines operations done on them using the IDA API
 #
-
-import idautils
 import idaapi
+import idautils
 import idc
 import re
+
+from miscUtils import misc
 
 
 class DataException(Exception):
@@ -119,18 +120,6 @@ class Data:
                     crefs.append(xref.to)
             elif xref.type != idc.fl_F:
                 drefs.append(xref.to)
-
-        # TODO this doesn't append all xref cases?
-        # for xref in idautils.XrefsFrom(self.ea, 0):
-        #     print("%08X: %08X" % (self.ea, xref.to))
-        #     # if the xref is to a far or near called function
-        #     if xref.type == idc.fl_CN or xref.type == idc.fl_CF:
-        #         if xref.to not in crefs:
-        #             crefs.append(xref.to)
-        #     # if the xref is to a read or write data access
-        #     if xref.type == idc.dr_W or xref.type == idc.dr_R:
-        #         if xref.to not in drefs:
-        #             drefs.append(xref.to)
 
         return crefs, drefs
 
@@ -529,9 +518,11 @@ class Data:
             raise(DataException('attempt to convert pool in non-pool inst'))
 
         # retrieve the instrution and register used
-        inst = disasm[:disasm.index(' ')]
+        words = list(filter(None, re.split('[ \t]', disasm)))
+
+        inst = words[0]
         no_inst_disasm = disasm[len(inst):].lstrip()
-        reg = no_inst_disasm[:no_inst_disasm.index(' ')]
+        reg = words[1]
 
         # it's not a pool instruction if it ends with ']' (ldr r0, [r1] vs ldr r0, =beep)
         if disasm[-1] == ']':
@@ -542,29 +533,68 @@ class Data:
 
         # there must be xrefs, LDR/STR must not be register relative
         xrefsFrom = self.getXRefsFrom()
+
         if not len(xrefsFrom[1]):
             raise(DataException('%07X: attempt to convert pool in non-pool inst' % self.ea))
 
         # sometimes, xrefsFrom point to both content_ra and pool_ea. order is inconsistent
-        pool_ea = xrefsFrom[1][0]
-        # heuristic that the pool location is likely closer to ea
-        if len(xrefsFrom[1]) == 2:
-            if abs(xrefsFrom[1][1] - self.ea) > abs(xrefsFrom[1][0] - self.ea):
-                pool_ea = xrefsFrom[1][0]
-            else:
-                pool_ea = xrefsFrom[1][1]
+        pool_ea = -1
+
+        # we're using the LDR Rx, =... format
+        if '=' in words[2]:
+            # assert '=' is the first char. it makes no sense otherwise
+            if words[2][0] != '=':
+                raise (DataException('%07X: found = in a weird place in PC-relative load' % self.ea))
+            # grab the value in the =. That content must be consistent with pool_ea's content
+            instName = words[2][1:]
+            # filter out potential ()s
+            if instName[0] == '(':
+                instName = instName[1:-1]
+            # filter out index
+            if '+' in instName:
+                instName = instName[:instName.index('+')]
+            for xref in xrefsFrom[1]:
+                # there are always two options, the content, or teh pool_ea. Make sure we're not
+                # grabbing content
+                if idc.Name(xref) and idc.Name(xref) != instName:
+                    pool_ea = xref
+                    break
+        # we're using the LDR RX, name format.
+        else:
+            # the correct xref is the one with the identical name in the instruction
+            for xref in xrefsFrom[1]:
+                d = Data(xref)
+                if (d.getName() == words[2] or
+                                '+' in words[2] and d.getName() == words[2][:words[2].index('+')]):
+                    pool_ea = xref
+
+        # assert that a pool_ea was found
+        if pool_ea == -1:
+            raise (DataException('%07X: no pool_ea was found' % self.ea))
 
         # confirm that the content being loaded is an int. can't load anything else to a register!
-        content = Data(pool_ea).getContent()
-        if type(content) != int:
+        poolData = Data(pool_ea)
+
+        content = poolData.getContent()
+
+        if type(content) != int and type(content) != long:
             raise(DataException("%07X: attempt to load non-int to register" % pool_ea))
 
         # write the actual pool value being loaded for readability
-        contentData = Data(content)
-        if contentData.isPointer(contentData.ea):
-            cmt = "=%s" % contentData.getName()
+        content = Data(content)
+        if content.isPointer(content.ea):
+            # figure out unsync between xref of pool and content data... that's the index +!
+            contentXref = poolData.getXRefsFrom()[1][0]
+            if contentXref - content.ea > 0:
+                index = "+%d" % (contentXref - content.ea)
+            elif contentXref - content.ea  < 0:
+                index = "-%d" % (content.ea - contentXref)
+            else:
+                index = ''
+
+            cmt = "%s%s" % (content.getName(), index)
         else:
-            cmt = "=0x%X" % contentData.ea
+            cmt = "=0x%X" % content.ea
 
         # the amount of shift to apply depends on the instruction mode
         if arm:
@@ -641,7 +671,7 @@ class Data:
         :return: filtered disasembly
         """
         # type: (str) -> str
-        words = list(filter(None, re.split('[ \t//]', disasm)))
+        words = list(filter(None, re.split('[ \t//()]', disasm)))
 
         for word in words:
             # special case, do not filter pool comments/names
