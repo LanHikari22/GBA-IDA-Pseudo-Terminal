@@ -10,20 +10,15 @@ import TerminalModule, miscUtils
 
 
 class dis(TerminalModule.TerminalModule, object):
-    def __init__(self):
+    def __init__(self, fmt='[+] dis (disassembly utils)'):
         """
         This module is responsible for printing disassemblies and necessary compoents
         of disassemblies
         """
-        super(type(self), self).__init__('[+] dis (dissassembly utils)')
-
-        self.rng.help = self.rng.__doc__
-        self.rng.fmt = "<start_ea> <end_ea>"
-        self.help += self._get_format("rng", self.rng) + '\n'
-
-        self.rngext.help = self.rngext.__doc__
-        self.rngext.fmt = "<start_ea> <end_ea>"
-        self.help += self._get_format("rngext", self.rngext) + '\n'
+        super(dis, self).__init__(fmt)
+        self.registerCommand(self, self.rng, "rng", "<start_ea> <end_ea>")
+        self.registerCommand(self, self.rngext, "rngext", "<start_ea> <end_ea>")
+        self.registerCommand(self, self.push, "push", "")
 
 
     @staticmethod
@@ -89,6 +84,7 @@ class dis(TerminalModule.TerminalModule, object):
             # advance to next item
             ea = ea + d.getSize()
 
+        xrefs.sort()
 
         output = ''
         # output file formats to include symbols into linking process
@@ -99,3 +95,31 @@ class dis(TerminalModule.TerminalModule, object):
             output += '.equ %s, 0x%07X\n' % (name, xref)
 
         return output
+
+    def push(self):
+        """
+        Automatcally generates disassembly and external symbols for all asmFiles specified
+        in env['asmFiles']
+        """
+
+        # grab necessary variables from the envrionment and assert that they were given
+        asmFiles = self.get('asmFiles')
+        asmPath = self.get('dismProjPath') + self.get('asmPath')
+        externsPath = self.get('dismProjPath') + self.get('externsPath')
+        if not asmFiles or not asmPath or not externsPath:
+            print('ERROR: environmental variables for asmFiles, dismProjPath, asmPath, and externsPath'
+                  + ' must be provided.')
+            return
+
+        for file in asmFiles.keys():
+            # generate disassembly and external symbols output
+            disasm = self.rng(asmFiles[file][0], asmFiles[file][1])
+            externs = self.rngext(asmFiles[file][0], asmFiles[file][1])
+            # write disassembly to file
+            asmfile = open(asmPath + file + '.s', 'w')
+            asmfile.write(disasm)
+            asmfile.close()
+            # write externs to file
+            incfile = open(externsPath + file + '.inc', 'w')
+            incfile.write(externs)
+            incfile.close()

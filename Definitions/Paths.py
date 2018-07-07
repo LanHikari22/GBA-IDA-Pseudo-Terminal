@@ -2,7 +2,7 @@
 # identical to the ROM analyzed by IDA
 # TODO: fix this so that it's all relative to this project only
 IDATOOLS_PATH = ''
-ROM_PATH = IDATOOLS_PATH + '..\\..\\mmbn6f.gba'
+ROM_PATH = ''
 PROJ_PATH = IDATOOLS_PATH + '..\\..\\'
 DEFS_DIR = IDATOOLS_PATH + '..\\..\\Definitions\\'
 VERSION_DIR = 'Falzar\\'
