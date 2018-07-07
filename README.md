@@ -8,7 +8,7 @@ This is a collection of tools that uses the IDAPython API to execute commands fo
 - There are modules inside pt that are clearly distinguished from commands when running `pt`.
 - To access them, simply refer to them from pt: `pt.dis.rng(0x8000000, 0x80000200)`. 
 - The module can also display its list of commands and modules when printed: `pt.dis`.
-- Every module and command should have docs and one-line summaries: `pt.help(pt.dis.rng)', `pt.fmt(pt.dis)`
+- Every module and command should have docs and one-line summaries: `pt.help(pt.dis.rng)`, `pt.fmt(pt.dis)`
 - The pseudoterminal has an environment to host paths and needed variables.
 - Run `pt.clrenv()` then a series of `pt.env(key=val)` commands to fill them. (Not all utilities need environmental variables)
 - The necessary environmental variables to fill can be found in `Definition/Environment.py`. You cannot create new ones.
