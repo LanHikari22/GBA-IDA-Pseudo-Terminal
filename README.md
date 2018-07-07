@@ -1,5 +1,5 @@
 # GBA-IDA-Pseudo-Terminal
-This is a collection of tools that uses the IDAPython API to execute commands for IDB analysis, data exportion, or database manipulation
+This is a collection of tools that uses the IDAPython API to execute commands for IDB analysis, disassembly, data exportion, or database manipulation
 
 # Usage
 - Run pt.py as a script in python. If successful, the echo command should run with a message in the output window.
