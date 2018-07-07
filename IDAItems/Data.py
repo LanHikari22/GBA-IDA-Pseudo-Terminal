@@ -584,11 +584,15 @@ class Data:
         content = Data(content)
         if content.isPointer(content.ea):
             # figure out unsync between xref of pool and content data... that's the index +!
-            contentXref = poolData.getXRefsFrom()[1][0]
-            if contentXref - content.ea > 0:
-                index = "+%d" % (contentXref - content.ea)
-            elif contentXref - content.ea  < 0:
-                index = "-%d" % (content.ea - contentXref)
+            # depending on the data format of the value in the db, it may have no xrefs...
+            if poolData.getXRefsFrom()[1]:
+                contentXref = poolData.getXRefsFrom()[1][0]
+                if contentXref - content.ea > 0:
+                    index = "+%d" % (contentXref - content.ea)
+                elif contentXref - content.ea  < 0:
+                    index = "-%d" % (content.ea - contentXref)
+                else:
+                    index = ''
             else:
                 index = ''
 
