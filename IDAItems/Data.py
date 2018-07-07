@@ -7,9 +7,6 @@ import idautils
 import idc
 import re
 
-from miscUtils import misc
-
-
 class DataException(Exception):
     def __init__(self, s):
         super(Exception, self).__init__(s)

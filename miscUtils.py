@@ -9,7 +9,7 @@ idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
 import idc
 from IDAItems import Function, Data
-import TerminalModule, miscUtils
+import TerminalModule
 
 
 class misc(TerminalModule.TerminalModule, object):
@@ -20,7 +20,13 @@ class misc(TerminalModule.TerminalModule, object):
         """
         super(misc, self).__init__(fmt)
 
+        self.registerCommand(self, self.test, "test", "<ea>")
         self.registerCommand(self, self.plcv, "plcv", "<ea>")
+
+    @staticmethod
+    def test(ea):
+        f = Function.Function(ea)
+        print(f.getStackVarDisasm())
 
     @staticmethod
     def plcv(ea):

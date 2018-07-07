@@ -268,7 +268,6 @@ class Function:
         else:
             disasm = ".arm\n"
 
-
         # spefiy function comment, if available
         # put // for function comment in each line
         if self.getComment():
@@ -278,6 +277,9 @@ class Function:
             comment = ''
         disasm += comment
 
+        # if available, provide .equs for all stack variables
+        disasm += self.getStackVarDisasm()
+
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
             d = Data.Data(ea)
@@ -285,4 +287,47 @@ class Function:
             # advance to next item
             ea = ea + d.getSize()
         disasm += "// end of function %s" % self.getName()
+        return disasm
+
+
+    def getStackVarDisasm(self):
+        """
+        if the function uses stack variables with SP, their symbols should be defined
+        :return:
+        """
+        disasm = ''
+        id = idc.GetFrame(self.func_ea)
+        firstMember = idc.GetFirstMember(id)
+        if firstMember != 0xFFFFFFFFL and firstMember != -1:
+            # first, obtain the base in a hacky way cuz i dunno how to do it otherwise
+            # find an SP call
+            ea = self.func_ea
+            base = -1
+            while ea < self.func_ea + self.getSize():
+                d = Data.Data(ea)
+                origDisasm = d.getOrigDisasm()
+                # case where the stack frame is referenced
+                if 'SP' in origDisasm and '#' in origDisasm and '+' in origDisasm:
+                    # grab the base
+                    base = int(origDisasm[origDisasm.index('#')+1:origDisasm.index('+')], 16)
+                ea += d.getSize()
+            if base == -1:
+                raise FunctionException('%07X: could not find stackframe base' % self.func_ea)
+
+            # build up disasm based on stack vars
+            lastMember = idc.GetLastMember(id)
+            i = firstMember
+            while i <= lastMember:
+                name = idc.GetMemberName(id, i)
+                off = idc.GetMemberOffset(id, name)
+                size = idc.GetMemberSize(id, i)
+                # sometimes, for some reason, the offset for stack variables does not follow linearly
+                if size:
+                    i += size
+                else:
+                    # reach next var, which might not be one size unit after the last...
+                    while not idc.GetMemberSize(id, i) and i <= lastMember:
+                        i += 1
+
+                disasm += ".equ %s, -0x%X\n"  % (name, base - off)
         return disasm
