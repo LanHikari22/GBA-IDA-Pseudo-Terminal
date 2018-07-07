@@ -13,15 +13,14 @@ import TerminalModule, miscUtils
 
 
 class misc(TerminalModule.TerminalModule, object):
-    def __init__(self):
+    def __init__(self, fmt='[+] misc (tools of all kind)'):
         """
         This module is responsible for printing disassemblies and necessary compoents
         of disassemblies
         """
-        super(type(self), self).__init__('[+] dis (dissassembly utils)')
+        super(misc, self).__init__(fmt)
 
-        self.registerCommand(self, self.rng, "rng", "<start_ea> <end_ea>")
-        self.registerCommand(self, self.rngext, "rngext", "<start_ea> <end_ea>")
+        self.registerCommand(self, self.plcv, "plcv", "<ea>")
 
     @staticmethod
     def plcv(ea):
@@ -43,7 +42,7 @@ class misc(TerminalModule.TerminalModule, object):
         """
         prints xref tuples in a good manner, with hex integer numbers in the lists
         """
-        return "(" + pt_hexArr(xrefs[0]) + ", " + pt_hexArr(xrefs[1]) + ")"
+        return "(" + misc.hexArr(xrefs[0]) + ", " + misc.hexArr(xrefs[1]) + ")"
 
     @staticmethod
     def hexArr(arr):
