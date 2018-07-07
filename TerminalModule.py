@@ -5,46 +5,49 @@ from Definitions import Environment
 
 
 class TerminalModule:
+
+    # those store records of all registered commands
+    helpRecords = {}
+    fmtRecords = {}
+
     def __init__(self, fmt):
-        self.fmt = fmt
-        self.help = self.fmt + '\n'
+        self.registerFmt(self, fmt)
+        self.registerHelp(self, fmt + '\n')
 
-    def cmds(self):
-        """
-        :return: list of all commands that can be executed from the module
-        """
-        for member in dir(self):
-            pass
-
-    def modules(self):
-        """
-        :return: list of all command modules found within the module
-        """
-        pass
-
-    @staticmethod
-    def _get_format(name, func):
-        """
-        adds the command to __docs__ of pt
-        :param name: name of the command
-        :param func: the command function to obtain __fmt__ from it
-        :return:
-        """
-        return name + ' ' + func.fmt
+    def __str__(self):
+        return self.help(self)
 
     @staticmethod
     def registerCommand(module, cmdf, name, fmt):
         """
-        Registers the command within the specified module, and assigns help and fmt members to it
+        Registers the command within the specified module, registers help and fmt entries for them,
+        and updates the help entry for the module
         :param module: the TerminalModule
         :param cmdf: the command function within the module
         :param name: the name of the command
         :param fmt: the one-line summary of how to use the command
         """
-        cmdf.help = cmdf.__doc__
-        cmdf.fmt = fmt
-        module.help += module._get_format(name, cmdf) + '\n'
+        TerminalModule.registerHelp(cmdf, cmdf.__doc__)
+        TerminalModule.registerFmt(cmdf, fmt)
+        TerminalModule.registerHelp(module, module.help(module) + name + ' ' + fmt + '\n')
 
+    @staticmethod
+    def registerHelp(key, help):
+        """
+        Registers the help message within the terminal help records
+        :param key: the key entry (command or module) to register the help for
+        :param help: the help message
+        """
+        TerminalModule.helpRecords[key] = help
+
+    @staticmethod
+    def registerFmt(key, fmt):
+        """
+        Registers the one-summary line for the module/commmand
+        :param key: the module/command being registered
+        :param fmt: its format string
+        """
+        TerminalModule.fmtRecords[key] = fmt
 
     @staticmethod
     def get(key):
@@ -57,3 +60,19 @@ class TerminalModule:
             return Environment.env[key]
         else:
             return None
+
+    @staticmethod
+    def fmt(unit):
+        """
+        :param unit: either a command, or a module
+        :return: one-line summary of command or module
+        """
+        return TerminalModule.fmtRecords[unit]
+
+    @staticmethod
+    def help(unit):
+        """
+        :param unit: a command or a module
+        :return: the docs for that command or module
+        """
+        return TerminalModule.helpRecords[unit]

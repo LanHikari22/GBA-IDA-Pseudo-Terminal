@@ -10,13 +10,14 @@ import TerminalModule
 
 
 class PseudoTerminal(TerminalModule.TerminalModule, object):
-    def __init__(self, fmt):
+    def __init__(self, fmt='[+] pt (main terminal)'):
         # the module itelf also has a summary format, this is created by TerminalModule
-        super(type(self),self).__init__("[+] pt (top module)")
+        super(PseudoTerminal, self).__init__(fmt)
 
         # eaach commznd in the module is added to the module help, and its __doc__ is
         # given the member alias help instead
-        super(PseudoTerminal, self).__init__(fmt)
+        self.registerCommand(self, self.help, "help", "<command/module>")
+        self.registerCommand(self, self.fmt, "fmt", "<command/module>")
         self.registerCommand(self, self.echo, "echo", "<msg>")
         self.registerCommand(self, self.clear, "clear", "")
         self.registerCommand(self, self.env, "env",  "<key>=<val>,...")
@@ -24,7 +25,7 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
 
         # __init__ of modules should set up things similarly to pt
         self.dis = disasmUtils.dis()
-        self.help += self.dis.fmt + '\n'
+        self.registerHelp(self, self.help(self) + self.fmt(self.dis) + '\n')
 
     @staticmethod
     def echo(msg):
@@ -72,6 +73,7 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
 
 
 
+
 if __name__ == '__main__':
-    pt = PseudoTerminal('')
+    pt = PseudoTerminal()
     pt.echo("beep beep!")
