@@ -20,13 +20,36 @@ class misc(TerminalModule.TerminalModule, object):
         """
         super(misc, self).__init__(fmt)
 
-        self.registerCommand(self, self.test, "test", "<ea>")
+        self.registerCommand(self, self.test, "test", "...")
+        self.registerCommand(self, self.fnrepl, "fnrepl", "<start_ea> <end_ea> <oldstr> <newstr>")
         self.registerCommand(self, self.plcv, "plcv", "<ea>")
 
     @staticmethod
     def test(ea):
-        f = Function.Function(ea)
-        print(f.getStackVarDisasm())
+        print(Data.Data(ea).getFormattedDisasm())
+
+    @staticmethod
+    def fnrepl(start_ea, end_ea, oldstr, newstr, log=True):
+        """
+        replace a string if detected in the names of all functions within range
+        :param start_ea: start of the range
+        :param end_ea: end of the range
+        :param oldstr: string to replace
+        :param newstr: replacement string
+        """
+        ea = start_ea
+        while ea < end_ea:
+            if Function.isFunction(ea):
+                f = Function.Function(ea)
+                if oldstr in f.getName():
+                    name = f.getName()
+                    f.setName(f.getName().replace(oldstr, newstr))
+                    if log: print("Renamed %s -> %s" % (name, f.getName()))
+
+                ea += f.getSize(withPool=True)
+            else:
+                ea += Data.Data(ea).getSize()
+
 
     @staticmethod
     def plcv(ea):

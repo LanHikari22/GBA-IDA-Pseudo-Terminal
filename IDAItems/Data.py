@@ -440,8 +440,8 @@ class Data:
                 if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
                 # add element and increment counter until new line
                 # if it's a pointer, display its label not just the number
-                # TODO: some pointers are lexx < 0x01000000? if num =< 255, it's very likely not a pointer
-                if isPointerArr and elem > 255:
+                # TODO: some pointers are lexx < 0x01000000? if num =< 0x01000000, it's very likely not a pointer
+                if isPointerArr and elem > 0x01000000:
                     name = idc.Name(elem)
                     if name:
                         disasm += "%s, " % name
@@ -673,15 +673,17 @@ class Data:
         """
         # type: (str) -> str
         words = list(filter(None, re.split('[ \t//()]', disasm)))
-
         for word in words:
             # special case, do not filter pool comments/names
             if word[0] == '=':
                 continue
-            # lower the word in the disasm if it's not a name
+            # lower the word in the disasm if it's not a global symbol
             if idc.get_name_ea(self.ea, word) == 0xffffffffL:
                 disasm = disasm.replace(word, word.lower(), 1)
-
+            # an exceptional case is symbols not globally defined... like stack symbols
+            if 'SP' in word.upper() and '+' in word and '#' in word and ']' in word:
+                stackVar = word[word.index('+')+1:word.index(']')] # [SP,#0xXX+<stackVar>]
+                disasm = disasm.replace(stackVar.lower(), stackVar, 1)
 
         return disasm
 

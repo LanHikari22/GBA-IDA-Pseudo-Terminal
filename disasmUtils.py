@@ -34,6 +34,9 @@ class dis(TerminalModule.TerminalModule, object):
         """
         ea = start_ea
         disasm = ''
+
+        # disassemble the range
+        ea = start_ea
         while ea < end_ea:
             if  Function.isFunction(ea):
                 f = Function.Function(ea)
@@ -111,7 +114,9 @@ class dis(TerminalModule.TerminalModule, object):
                   + ' must be provided.')
             return
 
-        for file in asmFiles.keys():
+        keys = asmFiles.keys()
+        keys.sort()
+        for file in keys:
             # generate disassembly and external symbols output
             disasm = self.rng(asmFiles[file][0], asmFiles[file][1])
             externs = self.rngext(asmFiles[file][0], asmFiles[file][1])
