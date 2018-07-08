@@ -35,6 +35,31 @@ class dis(TerminalModule.TerminalModule, object):
         ea = start_ea
         disasm = ''
 
+        # first, insert forward references. This is useful for debugging. (Comment regions with defined
+        # symbols)
+        frefs = []
+        while ea < end_ea:
+            if  Function.isFunction(ea):
+                f = Function.Function(ea)
+                if f.getName():
+                    frefs.append((f.getName(), f.func_ea))
+                ea = ea + f.getSize()
+            else:
+                d = Data.Data(ea)
+                if d.getName():
+                    frefs.append((d.getName(), d.ea))
+                ea = ea + d.getSize()
+
+        # add forward references to disassembly
+        disasm += "// forward references\n"
+        for name, ea in frefs:
+            disasm += ".equ %s, 0x%08X\n" % (name, ea)
+        disasm += "\n"
+
+        # rewind to disassemble
+        ea = start_ea
+
+
         # disassemble the range
         ea = start_ea
         while ea < end_ea:
@@ -64,10 +89,16 @@ class dis(TerminalModule.TerminalModule, object):
         ea = start_ea
         xrefs = []
 
+        # if there's a function at end_ea, include all of its refs
+        if Function.isFunction(end_ea):
+            f = Function.Function(end_ea)
+            end_ea = f.func_ea + f.getSize(withPool=True)
+
         # obtain xrefs of every data item, filtering out internal ones and duplicates
         while ea < end_ea:
             d = Data.Data(ea)
             # append crefs ands xrefs
+
             for xref in d.getXRefsFrom()[0]:
                 # all code refs shouldn't have a +1 in them. The thumb switch isn't involved with the symbol itself
                 if (idc.isCode(idc.GetFlags(xref)) or idc.isCode(idc.GetFlags(xref-1))) and xref & 1 == 1:
@@ -82,7 +113,8 @@ class dis(TerminalModule.TerminalModule, object):
                     xref = xref - 1
 
                 if ((xref < start_ea or xref >= end_ea) # filter internal (not external; within range)
-                        and xref not in xrefs): # filter duplicate
+                        and xref not in xrefs # filter duplicate
+                        and d.isPointer(xref)): # filter non-pointer symbols, like byte_50
                     xrefs.append(xref)
             # advance to next item
             ea = ea + d.getSize()

@@ -403,10 +403,25 @@ class Data:
         """
         # First, do the easy cases that just work with GetDisasm
         flags = idc.GetFlags(ea)
+        if idc.is_data(flags) and idc.is_byte(flags) and idc.get_item_size(ea) == 1:
+            pass
+        elif idc.is_data(flags) and idc.is_word(flags) and idc.get_item_size(ea) == 2:
+            pass
+        elif idc.is_data(flags) and idc.is_dword(flags) and idc.get_item_size(ea) == 4:
+            pass
         if idc.is_data(flags) and (idc.is_byte(flags) and idc.get_item_size(ea) == 1
                                    or idc.is_word(flags) and idc.get_item_size(ea) == 2
                                    or idc.is_dword(flags) and idc.get_item_size(ea) == 4):
-            disasm = idc.GetDisasm(ea)  # very simple, this works.
+            # normal case where an int is not misread as a reference
+            content = Data(ea).getContent()
+            if self.isPointer(content) or idc.Name(ea) == '':
+                disasm = idc.GetDisasm(ea)  # very simple, this works.
+            else:
+                # build the disassembly
+                if idc.is_byte(flags): op = 'DCB'
+                elif idc.is_word(flags): op = 'DCW'
+                else: op = 'DCD'
+                disasm = op + ' ' + '0x%X' % content
             return self._filterComments(disasm)
         else:  # The weird case... an array. I don't know why it's weird. IDA doesn't like it!
             # It is assumed this is an array, but the type is unknown. Imply type based on disasm of first line!
@@ -440,8 +455,7 @@ class Data:
                 if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
                 # add element and increment counter until new line
                 # if it's a pointer, display its label not just the number
-                # TODO: some pointers are lexx < 0x01000000? if num =< 0x01000000, it's very likely not a pointer
-                if isPointerArr and elem > 0x01000000:
+                if isPointerArr:
                     name = idc.Name(elem)
                     if name:
                         disasm += "%s, " % name
@@ -492,8 +506,9 @@ class Data:
 
     def isPointer(self, ea):
         # to account for the fact that the address can have a +1 or not for CPU mode switch
-        output = idaapi.get_name(ea) != '' or \
-                 idaapi.get_name(ea - 1) != ''  # in case of +1 for different CPU mode
+        # in case of +1 for different CPU mode, both ea and ea-1 are considered
+        # any value less than 0x01000000 is likely not a pointer
+        output = ea > 0x01000000 and (idaapi.get_name(ea) != '' or idaapi.get_name(ea - 1) != '')
         return output
 
     def _getPoolDisasm(self):

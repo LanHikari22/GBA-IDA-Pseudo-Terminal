@@ -282,6 +282,7 @@ class Function:
 
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
+            print("ea", "%07X" % ea)
             d = Data.Data(ea)
             disasm += d.getFormattedDisasm() + "\n"
             # advance to next item
@@ -307,12 +308,16 @@ class Function:
                 d = Data.Data(ea)
                 origDisasm = d.getOrigDisasm()
                 # case where the stack frame is referenced
-                if 'SP' in origDisasm and '#' in origDisasm and '+' in origDisasm:
+                if 'SP' in origDisasm and '#' in origDisasm and '[' in origDisasm:
                     # grab the base
-                    base = int(origDisasm[origDisasm.index('#')+1:origDisasm.index('+')], 16)
+                    if '+' in origDisasm:
+                        base = int(origDisasm[origDisasm.index('#')+1:origDisasm.index('+')], 16)
+                    else:
+                        base = 0
                 ea += d.getSize()
             if base == -1:
                 raise FunctionException('%07X: could not find stackframe base' % self.func_ea)
+
 
             # build up disasm based on stack vars
             lastMember = idc.GetLastMember(id)

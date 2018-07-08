@@ -26,7 +26,36 @@ class misc(TerminalModule.TerminalModule, object):
 
     @staticmethod
     def test(ea):
-        print(Data.Data(ea).getFormattedDisasm())
+        f = Function.Function(ea)
+        print(f.getStackVarDisasm())
+
+    def removeFuncChunks(self):
+        """
+        deletes all functions that have function chunks in them
+        and appends "function_chunks_" to their names
+        :return:
+        """
+        ea = 0x08000000
+        while ea < 0x08800000:
+            if Function.isFunction(ea):
+                f = idaapi.get_func(ea)
+                # chunk f
+                if f.tailqty > 0:
+                    print("Removing chunk function @ %07X" % f.startEA)
+                    idaapi.del_func(f.startEA)
+                    name = idc.Name(f.startEA)
+                    newName = 'function_chunks_%s' % name
+                    print("Renaming %s -> %s" % ((name, newName)))
+                    idc.MakeName(f.startEA, newName)
+                    ea += idc.get_item_size(ea)
+                else:
+                    f = Function.Function(ea)
+                    ea += f.getSize(withPool=True)
+            else:
+                ea += Data.Data(ea).getSize()
+        print("Removed all function chunks!")
+
+
 
     @staticmethod
     def fnrepl(start_ea, end_ea, oldstr, newstr, log=True):
