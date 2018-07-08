@@ -339,7 +339,7 @@ class Data:
 
     def _convertCode(self, ea, disasm):
         """
-        Just removing 'S' from instructions like MOVS.
+        modifies code data items so that they're compatible with arm-none-eabi-gcc
         :param ea: (long) addr of disasm
         :param disasm: (str) disasm to transform
         :return: (str) converted disasm
@@ -350,8 +350,12 @@ class Data:
             # some instructions take no operands, like NOP
             instName = disasm[:disasm.index(' ')] if ' ' in disasm else disasm
 
-            # if the instruction is THUMB, it cannot have an 'S' in it...
-            if self.getSize() == 2 and instName[-1] == 'S':
+            # if the instruction is THUMB, it cannot have an 'S' in it... (except for branches)
+            # the BIC instruction is not a branch, account for that
+            isThumb = self.getSize() == 2
+            isBranch = 'BIC' not in instName and instName[0] == 'B'
+            hasCond = instName[-1] == 'S'
+            if isThumb and not isBranch and hasCond:
                 output = instName[:-1] + ' ' + output[len(instName):].lstrip()
                 instName = instName[:-1]
 
@@ -383,7 +387,7 @@ class Data:
         :return: converted disassembly
         """
         while 'DCD' in disasm: disasm = disasm.replace('DCD', '.word')
-        while 'DCW' in disasm: disasm = disasm.replace('DCW', '.half')
+        while 'DCW' in disasm: disasm = disasm.replace('DCW', '.hword')
         while 'DCB' in disasm: disasm = disasm.replace('DCB', '.byte')
 
         return disasm

@@ -39,12 +39,6 @@ class dis(TerminalModule.TerminalModule, object):
         # symbols)
         frefs = []
         while ea < end_ea:
-            if  Function.isFunction(ea):
-                f = Function.Function(ea)
-                if f.getName():
-                    frefs.append((f.getName(), f.func_ea))
-                ea = ea + f.getSize()
-            else:
                 d = Data.Data(ea)
                 if d.getName():
                     frefs.append((d.getName(), d.ea))
