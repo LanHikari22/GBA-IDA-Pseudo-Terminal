@@ -7,6 +7,9 @@ import idautils
 import idc
 import re
 
+from IDAItems import Function
+
+
 class DataException(Exception):
     def __init__(self, s):
         super(Exception, self).__init__(s)
@@ -694,11 +697,13 @@ class Data:
             # lower the word in the disasm if it's not a global symbol
             if idc.get_name_ea(self.ea, word) == idaapi.BADADDR:
                 disasm = disasm.replace(word, word.lower(), 1)
-            # an exceptional case is symbols not globally defined... like stack symbols
-            if 'SP' in word.upper() and '+' in word and '#' in word and ']' in word:
-                stackVar = word[word.index('+')+1:word.index(']')] # [SP,#0xXX+<stackVar>]
-                disasm = disasm.replace(stackVar.lower(), stackVar, 1)
 
+        # an exceptional case is symbols not globally defined... like stack symbols
+        if Function.hasStackVars(self.ea) and '#' in disasm:
+            stackVars = Function.getStackVars(self.ea)
+            for name, off in stackVars:
+                if name in disasm or name.lower() in disasm:
+                    disasm = disasm.replace(name.lower(), name, 1)
         return disasm
 
     def _convertAlignDisasm(self, disasm):

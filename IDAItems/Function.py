@@ -14,9 +14,6 @@ from IDAItems import Data
 idaapi.require("IDAItems.Data")
 
 
-def isFunction(ea):
-    return idc.get_func_flags(ea) != -1
-
 class FunctionException(Exception):
     def __init__(self, s):
         super(Exception, self).__init__(s)
@@ -305,40 +302,91 @@ class Function:
         disasm = ''
         id = idc.GetFrame(self.func_ea)
         firstMember = idc.GetFirstMember(id)
-        if firstMember != 0xFFFFFFFFL and firstMember != -1:
-            # first, obtain the base in a hacky way cuz i dunno how to do it otherwise
-            # find an SP call
+        if hasStackVars(self.func_ea):
+            # first, obtain the base by finding an instruction that uses one of the stack variables
+            stackVars = getStackVars(self.func_ea)
             ea = self.func_ea
             base = -1
+
+            # search function instructions to find base (TODO: hacky, but i dunno how else to find base yet)
             while ea < self.func_ea + self.getSize():
                 d = Data.Data(ea)
                 origDisasm = d.getOrigDisasm()
                 # case where the stack frame is referenced
-                if 'SP' in origDisasm and '#' in origDisasm and '[' in origDisasm:
-                    # grab the base
-                    if '+' in origDisasm:
-                        base = int(origDisasm[origDisasm.index('#')+1:origDisasm.index('+')], 16)
-                    else:
-                        base = 0
+                for var, offset in stackVars:
+                    if var in origDisasm and '#' in origDisasm:
+                        # cases like LDR SP, [base+var_xx]
+                        if '[' in origDisasm:
+                            # grab the base
+                            if '+' in origDisasm:
+                                base = int(origDisasm[origDisasm.index('#')+1:origDisasm.index('+')], 16)
+                            else:
+                                base = 0
+                            # obtained base! no need to continue looping
+                            break
+                        # some cases like ADD SP, base+var_xx don't have '['
+                        elif '+' in origDisasm:
+                            base = int(origDisasm[origDisasm.index('#')+1:origDisasm.index('+')], 16)
+                            # obtained base! no need to continue looping
+                            break
+                if base != -1:
+                    break
                 ea += d.getSize()
             if base == -1:
                 raise FunctionException('%07X: could not find stackframe base' % self.func_ea)
 
-
-            # build up disasm based on stack vars
-            lastMember = idc.GetLastMember(id)
-            i = firstMember
-            while i <= lastMember:
-                name = idc.GetMemberName(id, i)
-                off = idc.GetMemberOffset(id, name)
-                size = idc.GetMemberSize(id, i)
-                # sometimes, for some reason, the offset for stack variables does not follow linearly
-                if size:
-                    i += size
-                else:
-                    # reach next var, which might not be one size unit after the last...
-                    while not idc.GetMemberSize(id, i) and i <= lastMember:
-                        i += 1
-
+            # build up disasm based on stack vars using base-relative offsets
+            for name, off in stackVars:
                 disasm += ".equ %s, -0x%X\n"  % (name, base - off)
+
         return disasm
+
+def isFunction(ea):
+    return idc.get_func_flags(ea) != -1
+
+def hasStackVars(ea):
+    """
+    :param ea: address of the function
+    :return: whether the function has stack variables or not
+    """
+    id = idc.GetFrame(ea)
+    firstMember = idc.GetFirstMember(id)
+    return firstMember != idaapi.BADADDR and firstMember != -1
+
+def getStackVars(ea, base=-1):
+    # type: (int, int) -> list[(str, int)]
+    """
+    Gets the stack variables associted with the function at ea
+    If no base is specified, the offsets don't include the base calculation in them
+    :param ea: the address of the function
+    :param base: the stack base, must obtain to compute the offsets relative to it
+    :return: a list of tuples, the stack variable name and its offset
+    """
+    stackVars = []
+    id = idc.GetFrame(ea)
+    firstMember = idc.GetFirstMember(id)
+    # if the function has stack variables
+    if firstMember != idaapi.BADADDR and firstMember != -1:
+        # build up disasm based on stack vars
+        lastMember = idc.GetLastMember(id)
+        i = firstMember
+        while i <= lastMember:
+            name = idc.GetMemberName(id, i)
+            off = idc.GetMemberOffset(id, name)
+            size = idc.GetMemberSize(id, i)
+            # append if varname is found (sometimes, None is returned because the variables are not in the next index)
+            if name:
+                if base == -1:
+                    # absolute offsets appended
+                    stackVars.append((name, off))
+                else:
+                    # base-relative offsets appended
+                    stackVars.append((name, base - off))
+            # sometimes, for some reason, the offset for stack variables does not follow linearly
+            if size:
+                i += size
+            else:
+                # reach next var, which might not be one size unit after the last...
+                while not idc.GetMemberSize(id, i) and i <= lastMember:
+                    i += 1
+    return stackVars

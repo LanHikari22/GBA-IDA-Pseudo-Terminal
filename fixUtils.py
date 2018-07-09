@@ -28,6 +28,7 @@ class fix(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.replNameParen, "replNameParen", "")
         # self.registerCommand(self, self.makeRedundantInstsData, "makeRedundantInstsData", "")
         self.registerCommand(self, self.makeThumb, "makeThumb", "<start_ea> <end_ea>")
+        self.registerCommand(self, self.changeASCII, "changeASCII", "")
 
     @staticmethod
     def remFuncChunks():
@@ -106,3 +107,21 @@ class fix(TerminalModule.TerminalModule, object):
             print("Successfully changed ARM modes to THUMB!")
         else:
             print("no ARM instruction found!")
+
+    @staticmethod
+    def changeASCII():
+        """
+        finds all ascii named data and changes it to bytes and removes its name
+        """
+        found = False
+        for ea, name in idautils.Names():
+            d = Data.Data(ea)
+            if idc.isASCII(d._getFlags()):
+                found = True
+                print("%07X: Make ASCII -> Byte" % ea)
+                idc.MakeByte(ea)
+                idc.MakeName(ea, '')
+        if found:
+            print("changed all ASCII data to byte data!")
+        else:
+            print("no ASCII data was found!")
