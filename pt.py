@@ -1,16 +1,17 @@
 import idaapi
-
-import fixUtils
-
 idaapi.require("miscUtils")
 idaapi.require("disasmUtils")
 idaapi.require("fixUtils")
+idaapi.require("srchUtils")
 idaapi.require("TerminalModule")
 idaapi.require("Definitions.Environment")
 from Definitions import Environment
 import miscUtils
 import disasmUtils
 import TerminalModule
+import fixUtils
+import srchUtils
+
 
 
 class PseudoTerminal(TerminalModule.TerminalModule, object):
@@ -34,6 +35,8 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         self.registerHelp(self, self.help(self) + self.fmt(self.misc) + '\n')
         self.fix = fixUtils.fix()
         self.registerHelp(self, self.help(self) + self.fmt(self.fix) + '\n')
+        self.srch = srchUtils.srch()
+        self.registerHelp(self, self.help(self) + self.fmt(self.srch) + '\n')
 
 
 

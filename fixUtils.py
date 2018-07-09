@@ -1,7 +1,9 @@
-# @file miscUtils
-# whatever utilities go here! sometimes for testing, sometimes for convenience!
+# @file fixUtils
+# utilities for automatic fixing go here!
 import idaapi
 import idautils
+
+import srchUtils
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
@@ -24,6 +26,8 @@ class fix(TerminalModule.TerminalModule, object):
 
         self.registerCommand(self, self.remFuncChunks, "remFuncChunks", "")
         self.registerCommand(self, self.replNameParen, "replNameParen", "")
+        # self.registerCommand(self, self.makeRedundantInstsData, "makeRedundantInstsData", "")
+        self.registerCommand(self, self.makeThumb, "makeThumb", "<start_ea> <end_ea>")
 
     @staticmethod
     def remFuncChunks():
@@ -82,3 +86,23 @@ class fix(TerminalModule.TerminalModule, object):
         :return:
         """
         raise(NotImplemented())
+
+    @staticmethod
+    def makeThumb(start_ea, end_ea):
+        """
+        Changes all ARM within the specified range to THUMB
+        :param ea: the address to start from
+        """
+        srch = srchUtils.srch()
+        ea = int(srch.nextarm(start_ea), 16)
+        foundARM = False
+        while ea <= end_ea:
+            foundARM = True
+            # fix arm to thumb
+            print("%07X: Changing to THUMB mode" % ea)
+            idc.SetRegEx(ea, "T", 1, idc.SR_user)
+            ea = int(srch.nextarm(ea), 16)
+        if foundARM:
+            print("Successfully changed ARM modes to THUMB!")
+        else:
+            print("no ARM instruction found!")
