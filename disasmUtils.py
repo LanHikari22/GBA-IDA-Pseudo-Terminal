@@ -67,6 +67,10 @@ class dis(TerminalModule.TerminalModule, object):
                 if debug: print("%07X: disass data %s @ %07X" % (ea, d.getName(), d.ea))
                 disasm += d.getFormattedDisasm() + "\n"
                 ea = ea + d.getSize()
+
+        # add comment for debugging purposes
+        disasm += "/*For debugging purposes, connect comment at any range!*/\n"
+
         return disasm
 
 

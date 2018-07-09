@@ -45,6 +45,13 @@ class Function:
         else:
             raise (FunctionException("Address %08x does not live within a function" % func_ea))
 
+    def __str__(self):
+        """
+        :return: (str) The disassembly, in a format compatible with arm-none-eabi-gcc
+        """
+        return self.getFormattedDisasm()
+
+
     def getName(self):
         return idaapi.get_func_name(self.func_ea)
 
@@ -282,7 +289,6 @@ class Function:
 
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
-            print("ea", "%07X" % ea)
             d = Data.Data(ea)
             disasm += d.getFormattedDisasm() + "\n"
             # advance to next item

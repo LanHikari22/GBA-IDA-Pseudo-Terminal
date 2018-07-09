@@ -1,12 +1,11 @@
 # @file miscUtils
 # whatever utilities go here! sometimes for testing, sometimes for convenience!
 import idaapi
-
-from Definitions import Architecture, Paths
-
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
+
+from Definitions import Architecture, Paths
 import idc
 from IDAItems import Function, Data
 import TerminalModule
@@ -29,14 +28,16 @@ class misc(TerminalModule.TerminalModule, object):
         f = Function.Function(ea)
         print(f.getStackVarDisasm())
 
-    def removeFuncChunks(self):
+    @staticmethod
+    def removeFuncChunks(start_ea, end_ea):
         """
         deletes all functions that have function chunks in them
         and appends "function_chunks_" to their names
-        :return:
+        :param start_ea: start of the range to remove function chunks in
+        :param end_ea: end of the range to remove function chunks in
         """
-        ea = 0x08000000
-        while ea < 0x08800000:
+        ea = start_ea
+        while ea < end_ea:
             if Function.isFunction(ea):
                 f = idaapi.get_func(ea)
                 # chunk f

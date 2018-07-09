@@ -34,6 +34,13 @@ class Data:
             ea += 1
         self.ea = ea
 
+    def __str__(self):
+        """
+        :return: (str) The disassembly, compatible with arm-none-eabi-gcc
+        """
+        return self.getFormattedDisasm()
+
+
     def getName(self):
         """
         :return: the item's name, as last recorded by idaapi
@@ -370,13 +377,6 @@ class Data:
 
         return output
 
-    def __str__(self):
-        """
-        :return: (str) The disassembly, but in a disassembler-compatible manner!
-        """
-        name = self.getName() and self.getName() + ':\n' or ''
-        return self.getFormattedDisasm()
-
     def _getFlags(self):
         return idc.GetFlags(self.ea)
 
@@ -407,18 +407,12 @@ class Data:
         """
         # First, do the easy cases that just work with GetDisasm
         flags = idc.GetFlags(ea)
-        if idc.is_data(flags) and idc.is_byte(flags) and idc.get_item_size(ea) == 1:
-            pass
-        elif idc.is_data(flags) and idc.is_word(flags) and idc.get_item_size(ea) == 2:
-            pass
-        elif idc.is_data(flags) and idc.is_dword(flags) and idc.get_item_size(ea) == 4:
-            pass
         if idc.is_data(flags) and (idc.is_byte(flags) and idc.get_item_size(ea) == 1
                                    or idc.is_word(flags) and idc.get_item_size(ea) == 2
                                    or idc.is_dword(flags) and idc.get_item_size(ea) == 4):
             # normal case where an int is not misread as a reference
             content = Data(ea).getContent()
-            if self.isPointer(content) or idc.Name(ea) == '':
+            if self.isPointer(content):
                 disasm = idc.GetDisasm(ea)  # very simple, this works.
             else:
                 # build the disassembly
@@ -512,7 +506,7 @@ class Data:
         # to account for the fact that the address can have a +1 or not for CPU mode switch
         # in case of +1 for different CPU mode, both ea and ea-1 are considered
         # any value less than 0x01000000 is likely not a pointer
-        output = ea > 0x01000000 and (idaapi.get_name(ea) != '' or idaapi.get_name(ea - 1) != '')
+        output = ea >= 0x01000000 and (idaapi.get_name(ea) != '' or idaapi.get_name(ea - 1) != '')
         return output
 
     def _getPoolDisasm(self):
@@ -692,12 +686,13 @@ class Data:
         """
         # type: (str) -> str
         words = list(filter(None, re.split('[ \t//()]', disasm)))
+
         for word in words:
             # special case, do not filter pool comments/names
             if word[0] == '=':
                 continue
             # lower the word in the disasm if it's not a global symbol
-            if idc.get_name_ea(self.ea, word) == 0xffffffffL:
+            if idc.get_name_ea(self.ea, word) == idaapi.BADADDR:
                 disasm = disasm.replace(word, word.lower(), 1)
             # an exceptional case is symbols not globally defined... like stack symbols
             if 'SP' in word.upper() and '+' in word and '#' in word and ']' in word:

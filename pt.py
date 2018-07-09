@@ -1,6 +1,10 @@
 import idaapi
+
+import fixUtils
+
 idaapi.require("miscUtils")
 idaapi.require("disasmUtils")
+idaapi.require("fixUtils")
 idaapi.require("TerminalModule")
 idaapi.require("Definitions.Environment")
 from Definitions import Environment
@@ -28,6 +32,9 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         self.registerHelp(self, self.help(self) + self.fmt(self.dis) + '\n')
         self.misc = miscUtils.misc()
         self.registerHelp(self, self.help(self) + self.fmt(self.misc) + '\n')
+        self.fix = fixUtils.fix()
+        self.registerHelp(self, self.help(self) + self.fmt(self.fix) + '\n')
+
 
 
     @staticmethod
