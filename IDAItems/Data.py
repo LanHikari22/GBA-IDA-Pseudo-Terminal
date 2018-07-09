@@ -386,9 +386,9 @@ class Data:
         :param disasm: disassembly to convert
         :return: converted disassembly
         """
-        while 'DCD' in disasm: disasm = disasm.replace('DCD', '.word')
-        while 'DCW' in disasm: disasm = disasm.replace('DCW', '.hword')
-        while 'DCB' in disasm: disasm = disasm.replace('DCB', '.byte')
+        while 'DCD ' in disasm: disasm = disasm.replace('DCD ', '.word ')
+        while 'DCW ' in disasm: disasm = disasm.replace('DCW ', '.hword ')
+        while 'DCB ' in disasm: disasm = disasm.replace('DCB ', '.byte ')
 
         return disasm
 
@@ -453,7 +453,7 @@ class Data:
                 if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
                 # add element and increment counter until new line
                 # if it's a pointer, display its label not just the number
-                if isPointerArr:
+                if isPointerArr and self.isPointer(elem):
                     name = idc.Name(elem)
                     if name:
                         disasm += "%s, " % name
