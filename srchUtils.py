@@ -22,7 +22,6 @@ class srch(TerminalModule.TerminalModule, object):
         """
         super(srch, self).__init__(fmt)
 
-        self.registerCommand(self, self.nextcode32, "nextcode32", "[searchStartEA[")
         self.registerCommand(self, self.nextarm, "nextarm", "[searchStartEA]")
         self.registerCommand(self, self.nextascii, "nextascii", "[searchStartEA]")
         # figure out the very last ea reachable
@@ -32,11 +31,12 @@ class srch(TerminalModule.TerminalModule, object):
                 self.end_ea = idc.SegEnd(seg)
 
 
-    def nextcode32(self, ea=idc.here()):
+    def nextarm(self, ea=idc.here()):
+        # type: (int) -> str
         """
-        finds the next address by which the 'T' register is 0: ARM
-        :param ea: address to start seaching from
-        :return:  the address (hex formatted in str) of the next item marked as ARM
+        Finds the next ARM item, which has a Segment register value 'T' of 0
+        :param ea: address to start searching from
+        :return: the address (in str) of the next ARM instruction
         """
         # don't count this item
         ea += Data.Data(ea).getSize()
@@ -47,27 +47,6 @@ class srch(TerminalModule.TerminalModule, object):
             if idc.GetReg(ea, 'T') == 0:
                 output = ea
                 break
-            ea += d.getSize()
-        return '%07X' % output
-
-
-    def nextarm(self, ea=idc.here()):
-        # type: (int) -> str
-        """
-        Finds the next ARM instruction
-        :param ea: address to start searching from
-        :return: the address (in str) of the next ARM instruction
-        """
-        # don't count this item
-        ea += Data.Data(ea).getSize()
-        output = idaapi.BADADDR
-        while ea < self.end_ea:
-            d = Data.Data(ea)
-            # ARM, unless it's a branch
-            if d.isCode() and d.getSize() == 4:
-                if d.getOrigDisasm()[0] != 'B':
-                    output = ea
-                    break
             ea += d.getSize()
         return '%07X' % output
 
