@@ -28,6 +28,7 @@ class misc(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.fnrepl, "fnrepl", "<start_ea> <end_ea> <oldstr> <newstr>")
         self.registerCommand(self, self.plcv, "plcv", "<ea>")
         self.registerCommand(self, self.nlrepl, "nlrepl", "<oldStr> <newStr>")
+        self.registerCommand(self, self.rngmkd, "rngmkd", "<start_ea> <end_ea>")
 
     @staticmethod
     def test(n):
@@ -138,3 +139,19 @@ class misc(TerminalModule.TerminalModule, object):
         bytes = []
         for char in data: bytes.append(ord(char))
         return bytes
+
+    def rngmkd(self, start_ea, end_ea):
+        """
+        Turns the data in the range to words. If not aligned with words, turns into bytes instead
+        :param start_ea: start of the range
+        :param end_ea: end of the range
+        """
+        ea = start_ea
+        while ea % 4 != 0:
+            print ('%07X: -> byte' % ea)
+            idc.MakeByte(ea)
+            ea += 1
+        while ea < end_ea:
+            print ('%07X: -> word' % ea)
+            idc.MakeDword(ea)
+            ea += 4

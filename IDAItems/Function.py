@@ -332,8 +332,9 @@ class Function:
                 if base != -1:
                     break
                 ea += d.getSize()
+            # if base couldn't be found still, it's likely no SP access is done with variables
             if base == -1:
-                raise FunctionException('%07X: could not find stackframe base' % self.func_ea)
+                base = 0
 
             # build up disasm based on stack vars using base-relative offsets
             for name, off in stackVars:
