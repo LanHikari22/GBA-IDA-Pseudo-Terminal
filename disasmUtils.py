@@ -35,8 +35,7 @@ class dis(TerminalModule.TerminalModule, object):
         ea = start_ea
         disasm = ''
 
-        # first, insert forward references. This is useful for debugging. (Comment regions with defined
-        # symbols)
+        # first, insert forward references. They are necessary for code using symbols within its file before definition
         frefs = []
         while ea < end_ea:
                 d = Data.Data(ea)
@@ -49,9 +48,6 @@ class dis(TerminalModule.TerminalModule, object):
         for name, ea in frefs:
             disasm += ".equ %s, 0x%08X\n" % (name, ea)
         disasm += "\n"
-
-        # rewind to disassemble
-        ea = start_ea
 
 
         # disassemble the range

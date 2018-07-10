@@ -23,7 +23,7 @@ class srch(TerminalModule.TerminalModule, object):
         super(srch, self).__init__(fmt)
 
         self.registerCommand(self, self.nextarm, "nextarm", "[searchStartEA]")
-
+        self.registerCommand(self, self.nextascii, "nextascii", "[searchStartEA]")
         # figure out the very last ea reachable
         self.end_ea = 0
         for seg in idautils.Segments():
@@ -32,6 +32,12 @@ class srch(TerminalModule.TerminalModule, object):
 
 
     def nextarm(self, ea=idc.here()):
+        # type: (int) -> str
+        """
+        Finds the next ARM instruction
+        :param ea: address to start searching from
+        :return: the address (in str) of the next ARM instruction
+        """
         # don't count this item
         ea += Data.Data(ea).getSize()
         output = idaapi.BADADDR
@@ -42,5 +48,24 @@ class srch(TerminalModule.TerminalModule, object):
                 if d.getOrigDisasm()[0] != 'B':
                     output = ea
                     break
+            ea += d.getSize()
+        return '%07X' % output
+
+    def nextascii(self, ea=idc.here()):
+        # type: (int) -> str
+        """
+        returns the next data item containing ascii characters (seems valid for utf too)
+        :param ea: the address to start searching from
+        :return: hex formatted str of the address of the next ascii item
+        """
+        # don't count this item
+        ea += Data.Data(ea).getSize()
+        output = idaapi.BADADDR
+        while ea < self.end_ea:
+            d = Data.Data(ea)
+            # ARM, unless it's a branch
+            if idc.isASCII(d._getFlags()):
+                output = ea
+                break
             ea += d.getSize()
         return '%07X' % output

@@ -1,6 +1,11 @@
 # @file miscUtils
 # whatever utilities go here! sometimes for testing, sometimes for convenience!
 import idaapi
+import idautils
+
+import srchUtils
+from srchUtils import srch
+
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
@@ -22,17 +27,18 @@ class misc(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.test, "test", "...")
         self.registerCommand(self, self.fnrepl, "fnrepl", "<start_ea> <end_ea> <oldstr> <newstr>")
         self.registerCommand(self, self.plcv, "plcv", "<ea>")
+        self.registerCommand(self, self.nlrepl, "nlrepl", "<oldStr> <newStr>")
 
     @staticmethod
-    def test(ea):
-        f = Function.Function(ea)
-        print(f.getStackVarDisasm())
-
+    def test(n):
+        for i in range(n):
+            next = int(srchUtils.srch().nextascii(), 16)
+            idc.MakeWord(next)
 
     @staticmethod
     def fnrepl(start_ea, end_ea, oldstr, newstr, log=True):
         """
-        replace a string if detected in the names of all functions within range
+        replace a string once if detected in the names of all functions within range
         :param start_ea: start of the range
         :param end_ea: end of the range
         :param oldstr: string to replace
@@ -51,6 +57,19 @@ class misc(TerminalModule.TerminalModule, object):
             else:
                 ea += Data.Data(ea).getSize()
 
+    @staticmethod
+    def nlrepl(oldstr, newstr, log=True):
+        """
+        Replaces string from all names in the global name list
+        :param oldstr: occurrence to replace
+        :param newstr: replaced string
+        :param log: True by default, logging messages of what got replaced
+        """
+        for ea, name in idautils.Names():
+            if oldstr in name:
+                newName = name.replace(oldstr, newstr, 1)
+                if log: print('%07X: Replacing %s -> %s' % (ea, name, newName))
+                idc.MakeName(ea, newName)
 
     @staticmethod
     def plcv(ea):

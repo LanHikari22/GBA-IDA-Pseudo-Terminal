@@ -337,7 +337,12 @@ class Function:
 
             # build up disasm based on stack vars using base-relative offsets
             for name, off in stackVars:
-                disasm += ".equ %s, -0x%X\n"  % (name, base - off)
+                relOff = base - off
+                if relOff > 0:
+                    disasm += ".equ %s, -0x%X\n"  % (name, abs(relOff))
+                else:
+                    disasm += ".equ %s, 0x%X\n"  % (name, abs(relOff))
+
 
         return disasm
 
@@ -370,18 +375,26 @@ def getStackVars(ea, base=-1):
         # build up disasm based on stack vars
         lastMember = idc.GetLastMember(id)
         i = firstMember
+
+        # Stack can be offset, first member might not be found at index 0, and all offsets must be adjusted by this
+        foundFirstElement = False
+        stackOffset = 0
         while i <= lastMember:
             name = idc.GetMemberName(id, i)
-            off = idc.GetMemberOffset(id, name)
+            off = idc.GetMemberOffset(id, name) # this is the offset in the struct... which isn't always consistent!
             size = idc.GetMemberSize(id, i)
             # append if varname is found (sometimes, None is returned because the variables are not in the next index)
             if name:
+                # first variable found! this is the stack of the stack variables!
+                if not foundFirstElement:
+                    stackOffset = i
+                    foundFirstElement = True
                 if base == -1:
                     # absolute offsets appended
-                    stackVars.append((name, off))
+                    stackVars.append((name, off - stackOffset))
                 else:
                     # base-relative offsets appended
-                    stackVars.append((name, base - off))
+                    stackVars.append((name, base - off - stackOffset))
             # sometimes, for some reason, the offset for stack variables does not follow linearly
             if size:
                 i += size

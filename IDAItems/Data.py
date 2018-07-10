@@ -350,6 +350,8 @@ class Data:
     def _convertCode(self, ea, disasm):
         """
         modifies code data items so that they're compatible with arm-none-eabi-gcc
+        Some labels are reserved for conversion actions:
+            mkdata:  Converts the code to data, this is necessary when encountering redundant instructions.
         :param ea: (long) addr of disasm
         :param disasm: (str) disasm to transform
         :return: (str) converted disasm
@@ -357,6 +359,7 @@ class Data:
         flags = idc.GetFlags(ea)
         output = disasm  # Default case, no modifications
         if idc.isCode(flags):
+
             # some instructions take no operands, like NOP
             instName = disasm[:disasm.index(' ')] if ' ' in disasm else disasm
 
@@ -378,6 +381,16 @@ class Data:
             except DataException:
                 pass
 
+            # if the instruction is an adc, replace it with a short
+            if "ADR " in output:
+                output = "DCW 0x%X // %s" % (self.getContent(), output)
+                output = self._convertData(output)
+
+            # parse label commands -- if it's a redundant instruction, it should have the mkdata tag in it
+            if self.getName().startswith("mkdata"):
+                output = "DCW 0x%X // %s" % (self.getContent(), output)
+                output = self._convertData(output)
+
         return output
 
     def _getFlags(self):
@@ -392,6 +405,10 @@ class Data:
         while 'DCD ' in disasm: disasm = disasm.replace('DCD ', '.word ')
         while 'DCW ' in disasm: disasm = disasm.replace('DCW ', '.hword ')
         while 'DCB ' in disasm: disasm = disasm.replace('DCB ', '.byte ')
+        # gnu assembler format
+        while '.long ' in disasm: disasm = disasm.replace('.long ', '.word ')
+        while '.short ' in disasm: disasm = disasm.replace('.short ', '.hword ')
+
 
         return disasm
 
@@ -414,7 +431,8 @@ class Data:
                                    or idc.is_word(flags) and idc.get_item_size(ea) == 2
                                    or idc.is_dword(flags) and idc.get_item_size(ea) == 4):
             # normal case where an int is not misread as a reference
-            content = Data(ea).getContent()
+            data = Data(ea)
+            content = data.getContent()
             if self.isPointer(content):
                 disasm = idc.GetDisasm(ea)  # very simple, this works.
             else:
@@ -426,7 +444,6 @@ class Data:
             return self._filterComments(disasm)
         else:  # The weird case... an array. I don't know why it's weird. IDA doesn't like it!
             # It is assumed this is an array, but the type is unknown. Imply type based on disasm of first line!
-
             # analysis on the array is based on the very first line
             firstLineSplitDisasm = list(filter(None, re.split('[ ,]', idc.GetDisasm(ea))))
             dataType = firstLineSplitDisasm[0]
@@ -442,6 +459,9 @@ class Data:
             elif elemsPerLine == 0:  # when specifying 0, all will show in one line!
                 elemsPerLine = len(arr)
 
+
+            # whether to display a name, or data, is determiend by the xrefs from this item!
+            xrefs = self.getXRefsFrom()
             # determine if this is normal data, or pointers if dispLabel is enabled
             if dispLabel:
                 isPointerArr = self.hasPointer()
@@ -455,8 +475,8 @@ class Data:
                 # tab if new line
                 if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
                 # add element and increment counter until new line
-                # if it's a pointer, display its label not just the number
-                if isPointerArr and self.isPointer(elem):
+                # if it's a pointer and defined as an xref, display its label not just the number
+                if isPointerArr and self.isPointer(elem) and (elem in xrefs[0] or elem in xrefs[1]):
                     name = idc.Name(elem)
                     if name:
                         disasm += "%s, " % name
@@ -509,7 +529,10 @@ class Data:
         # to account for the fact that the address can have a +1 or not for CPU mode switch
         # in case of +1 for different CPU mode, both ea and ea-1 are considered
         # any value less than 0x01000000 is likely not a pointer
-        output = ea >= 0x01000000 and (idaapi.get_name(ea) != '' or idaapi.get_name(ea - 1) != '')
+        output = ea >= 0x01000000 and (
+            idaapi.get_name(ea) != '' or
+            idaapi.get_name(ea - 1) != '' or
+            idaapi.get_name(Data(ea).ea) != '')
         return output
 
     def _getPoolDisasm(self):
@@ -574,6 +597,7 @@ class Data:
                     break
         # we're using the LDR RX, name format.
         else:
+            # TODO: this format now breaks!
             # the correct xref is the one with the identical name in the instruction
             for xref in xrefsFrom[1]:
                 d = Data(xref)
@@ -589,6 +613,10 @@ class Data:
         poolData = Data(pool_ea)
 
         content = poolData.getContent()
+
+        # if the pointer derefernced in the pool is an array, it's the first element being dereferenced
+        if type(content) == list:
+            content = content[0]
 
         if type(content) != int and type(content) != long:
             raise(DataException("%07X: attempt to load non-int to register" % pool_ea))

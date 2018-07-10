@@ -121,6 +121,8 @@ class fix(TerminalModule.TerminalModule, object):
                 print("%07X: Make ASCII -> Byte" % ea)
                 idc.MakeByte(ea)
                 idc.MakeName(ea, '')
+
+
         if found:
             print("changed all ASCII data to byte data!")
         else:
