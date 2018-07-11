@@ -29,6 +29,7 @@ class fix(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.markRedundantInsts, "markRedundantInsts", "<start_ea> <end_ea>")
         self.registerCommand(self, self.makeThumb, "makeThumb", "<start_ea> <end_ea>")
         self.registerCommand(self, self.changeASCII, "changeASCII", "")
+        self.registerCommand(self, self.removeStackVarUsages, "removeStackVarUsages", "<start_ea> <end_ea>")
 
     @staticmethod
     def remFuncChunks():
@@ -97,12 +98,8 @@ class fix(TerminalModule.TerminalModule, object):
                 redundant = True
                 # MOVS R3, R3
                 content = d.getContent()
-                if content == 0x1B:
-                    print("%07X: <mkdata> (MOVS R3, R3)" % (ea))
-                elif content == 0x09:
-                    print("%07X: <mkdata> (MOVS R1, R1)" % (ea))
-                elif content == 0x1C00:
-                    print("%07X: <mkdata> (ADDS R0, R0, #0)" % (ea))
+                if d.getContent() in srchUtils.srch._getFakeInstructions():
+                    print("%07X: <mkdata>" % (ea))
                 else:
                     redundant = False
 
@@ -115,6 +112,7 @@ class fix(TerminalModule.TerminalModule, object):
                     d.setComment(cmt)
             ea += d.getSize()
 
+
     @staticmethod
     def makeThumb(start_ea, end_ea):
         """
@@ -122,21 +120,21 @@ class fix(TerminalModule.TerminalModule, object):
         :param ea: the address to start from
         """
         srch = srchUtils.srch()
-        ea = int(srch.nextarm(start_ea), 16)
+        ea = int(srch.nextarm(start_ea, ui=False), 16)
         foundARM = False
         while ea <= end_ea:
             foundARM = True
             # fix arm to thumb
             print("%07X: Changing to THUMB mode" % ea)
             idc.SetRegEx(ea, "T", 1, idc.SR_user)
-            ea = int(srch.nextarm(ea), 16)
+            ea = int(srch.nextarm(ea, ui=False), 16)
         if foundARM:
             print("Successfully changed ARM modes to THUMB!")
         else:
             print("no ARM instruction found!")
 
     @staticmethod
-    def changeASCII():
+    def changeASCII(start_ea, ):
         """
         finds all ascii named data and changes it to bytes and removes its name
         """
@@ -154,3 +152,27 @@ class fix(TerminalModule.TerminalModule, object):
             print("changed all ASCII data to byte data!")
         else:
             print("no ASCII data was found!")
+
+    @staticmethod
+    def removeStackVarUsages(self_ea, end_ea):
+        madeChanges = False
+        for func_ea in idautils.Functions(self_ea, end_ea):
+            changedStackVar = False
+            if Function.hasStackVars(func_ea):
+                stackVars = Function.getStackVars(func_ea)
+                # traverse data items of function and op_bin all
+                ea = func_ea
+                while ea < func_ea + Function.Function(func_ea).getSize(withPool=False):
+                    d = Data.Data(ea)
+                    for name, off in stackVars:
+                        if name != ' s' and name in d.getFormattedDisasm():
+                            changedStackVar = True
+                            if not madeChanges: madeChanges = True
+                            idc.op_hex(d.ea, 1)
+                    ea += d.getSize()
+                if changedStackVar:
+                    print('%07X: stackvars op -> hex' % func_ea)
+        if madeChanges:
+            print("Removed all stack variable usages!")
+        else:
+            print("No stack variable usages to remove!")

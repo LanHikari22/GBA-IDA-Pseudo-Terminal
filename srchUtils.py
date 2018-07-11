@@ -22,12 +22,12 @@ class srch(TerminalModule.TerminalModule, object):
         """
         super(srch, self).__init__(fmt)
 
-        self.registerCommand(self, self.nextarm, "nextarm", "<search_ea>")
-        self.registerCommand(self, self.nextascii, "nextascii", "<search_ea>")
-        self.registerCommand(self, self.nextfakeinst, "nextfakeinst", "<search_ea>")
-        self.registerCommand(self, self.nextname, "nextname", "<search_ea>")
-        self.registerCommand(self, self.nextknown, "nextknown", "<search_ea>")
-        self.registerCommand(self, self.nextbin, "nextbin", "<search_ea>")
+        self.registerCommand(self, self.nextarm, "nextarm", "<search_ea> [ui=True]")
+        self.registerCommand(self, self.nextascii, "nextascii", "<search_ea> [ui=True]")
+        self.registerCommand(self, self.nextfakeinst, "nextfakeinst", "<search_ea> [ui=True]")
+        self.registerCommand(self, self.nextname, "nextname", "<search_ea> [ui=True]")
+        self.registerCommand(self, self.nextknown, "nextknown", "<search_ea [ui=True]>")
+        self.registerCommand(self, self.nextbin, "nextbin", "<search_ea> [ui=True")
 
         # figure out the very last ea reachable
         self.end_ea = 0
@@ -36,11 +36,12 @@ class srch(TerminalModule.TerminalModule, object):
                 self.end_ea = idc.SegEnd(seg)
 
 
-    def nextarm(self, ea):
+    def nextarm(self, ea, ui=True):
         # type: (int) -> str
         """
         Finds the next ARM item, which has a Segment register value 'T' of 0
         :param ea: address to start searching from
+        :param ui: if True, jump to address automatically
         :return: the address (in str) of the next ARM instruction
         """
         # don't count this item
@@ -55,11 +56,12 @@ class srch(TerminalModule.TerminalModule, object):
             ea += d.getSize()
         return '%07X' % output
 
-    def nextascii(self, ea):
+    def nextascii(self, ea, ui=True):
         # type: (int) -> str
         """
         returns the next data item containing ascii characters (seems valid for utf too)
         :param ea: the address to start searching from
+        :param ui: if True, jump to address automatically
         :return: hex formatted str of the address of the next ascii item
         """
         # don't count this item
@@ -72,14 +74,17 @@ class srch(TerminalModule.TerminalModule, object):
                 output = ea
                 break
             ea += d.getSize()
+        if ui: idaapi.jumpto(output)
         return '%07X' % output
 
-    def nextfakeinst(self, ea):
+    def nextfakeinst(self, ea, ui=True):
         # type: (int) -> str
         """
-        returns the next code item which has a content value <= 0xFF.
-        those are likely (but not always) to be actually data.
+        returns the next code item which is registered as a potential fake instruction.
+        Those may also be redundant instructions, which get encoded differently outside of IDA
+        the found instructions may also be pure data
         :param ea: address to start searching from
+        :param ui: if True, jump to address automatically
         :return: hex formatted ea
         """
         # don't count this item
@@ -88,16 +93,29 @@ class srch(TerminalModule.TerminalModule, object):
         while ea < self.end_ea:
             d = Data.Data(ea)
             # ARM, unless it's a branch
-            if d.isCode() and d.getContent() <= 0xFF:
+            if d.isCode() and d.getContent() in self._getFakeInstructions():
                 output = ea
                 break
             ea += d.getSize()
+        # trigger the gui to jump to the hypothetical next fake instruction
+        if ui: idaapi.jumpto(ea)
         return '%07X' % output
 
-    def nextname(self, ea):
+    @staticmethod
+    def _getFakeInstructions():
+        """
+        a list of detected instructions with different encoding using arm-none-eabi gcc
+        :return: list of opcodes
+        """
+        # TODO: super clumsy, remove this with logical detection
+        return [0x0, 0x1, 0xA, 0x3, 0x4, 0x1B, 0x09, 0x19, 0x1C00, 0x1C1B, 0x1F9B]
+
+
+    def nextname(self, ea, ui=True):
         """
         Finds the next ea with which a name exists
         :param ea: ea to start searching from
+        :param ui: if True, jump to address automatically
         :return: hex formatted ea of next name
         """
         # don't count this item
@@ -109,12 +127,14 @@ class srch(TerminalModule.TerminalModule, object):
                 output = ea
                 break
             ea += d.getSize()
+        if ui: idaapi.jumpto(ea)
         return '%07X' % output
 
-    def nextknown(self, ea):
+    def nextknown(self, ea, ui=True):
         """
         Finds the next ea with which a name exists
         :param ea: ea to start searching from
+        :param ui: if True, jump to address automatically
         :return: hex formatted ea of next name
         """
         # don't count this item
@@ -126,12 +146,15 @@ class srch(TerminalModule.TerminalModule, object):
                 output = ea
                 break
             ea += d.getSize()
+        if ui: idaapi.jumpto(ea)
         return '%07X' % output
 
-    def nextbin(self, ea):
+    def nextbin(self, ea, ui=True):
         """
         Finds the next big blob of data. The heuristic is it has to be at least 0x1000 in size
+        UI jumps to start_ea automatically.
         :param ea: ea to search from
+        :param ui: if True, jump to address automatically
         :return: tuple hex format of the bin range: (%07X, %07X)
         """
         # don't count this item
@@ -151,7 +174,7 @@ class srch(TerminalModule.TerminalModule, object):
         while ea < self.end_ea:
             d = Data.Data(ea)
 
-            if d.isData():
+            if d.isData() or d.isUnknown():
                 if state == st_start:
                     start_ea = ea
                     size = 0
@@ -173,13 +196,15 @@ class srch(TerminalModule.TerminalModule, object):
                     break
 
             ea += d.getSize()
-        return '%07X, %07X' % (start_ea, end_ea)
+        idaapi.jumpto(start_ea)
+        return '0x%07X, 0x%07X' % (start_ea, end_ea)
 
-    def nextstkfunc(self, ea):
+    def nextstkfunc(self, ea, ui=True):
         # type: (int) -> str
         """
         Finds the next function that uses stack variables
         :param ea: the current address to search from
+        :param ui: if True, jump to address automatically
         :return: hex formatted ea of next stack function
         """
         raise(NotImplemented())

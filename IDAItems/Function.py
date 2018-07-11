@@ -294,7 +294,8 @@ class Function:
         disasm += comment
 
         # if available, provide .equs for all stack variables
-        disasm += self.getStackVarDisasm()
+        # TODO: stack variables no longer supported
+        # disasm += self.getStackVarDisasm()
 
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
@@ -382,6 +383,8 @@ def getStackVars(ea, base=-1):
     """
     stackVars = []
     id = idc.GetFrame(ea)
+
+
     firstMember = idc.GetFirstMember(id)
     # if the function has stack variables
     if firstMember != idaapi.BADADDR and firstMember != -1:

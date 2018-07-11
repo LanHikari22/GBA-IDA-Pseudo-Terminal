@@ -732,11 +732,12 @@ class Data:
                 disasm = disasm.replace(word, word.lower(), 1)
 
         # an exceptional case is symbols not globally defined... like stack symbols
-        if IDAItems.Function.hasStackVars(self.ea) and '#' in disasm:
-            stackVars = IDAItems.Function.getStackVars(self.ea)
-            for name, off in stackVars:
-                if name in disasm or name.lower() in disasm:
-                    disasm = disasm.replace(name.lower(), name, 1)
+        # TODO: stack variables not supported
+        # if IDAItems.Function.hasStackVars(self.ea) and '#' in disasm:
+        #     stackVars = IDAItems.Function.getStackVars(self.ea)
+        #     for name, off in stackVars:
+        #         if name in disasm or name.lower() in disasm:
+        #             disasm = disasm.replace(name.lower(), name, 1)
         return disasm
 
     def _convertAlignDisasm(self, disasm):
