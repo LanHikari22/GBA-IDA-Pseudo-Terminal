@@ -28,16 +28,18 @@ class misc(TerminalModule.TerminalModule, object):
 
         self.registerCommand(self, self.test, "test", "...")
         self.registerCommand(self, self.time, "time", "<func> <func_args>")
+
         self.registerCommand(self, self.fnrepl, "fnrepl", "<start_ea> <end_ea> <oldstr> <newstr>")
         self.registerCommand(self, self.plcv, "plcv", "<ea>")
         self.registerCommand(self, self.nlrepl, "nlrepl", "<oldStr> <newStr>")
         self.registerCommand(self, self.rngmkd, "rngmkd", "<start_ea> <end_ea>")
 
     @staticmethod
-    def test(n):
-        for i in range(n):
-            next = int(srchUtils.srch().nextascii(), 16)
-            idc.MakeWord(next)
+    def test():
+        for ea, name in idautils.Names():
+            if "mkdata_" in name:
+                print("%07X: delete name %s" % (ea, name))
+                idc.MakeName(ea, '' )
 
     @staticmethod
     def time(func, *args, **kwargs):

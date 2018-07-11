@@ -85,33 +85,34 @@ class fix(TerminalModule.TerminalModule, object):
         Some instructions, like add r0, r0, #0 can be optimized to add r0, #0 by assemblers.
         This gets in the way of disassembly. This attempts to fix that by replacing all such occurrances with
         purely their data format, and it also adds a comment on that line specifying the original inst.
+
+        To specify that a data item has to be forced to data, this puts <mkdata> in its comment.
         :param start_ea: start address of the marking
         :param end_ea: end address of the marking
         """
         ea = start_ea
         while ea < end_ea:
             d = Data.Data(ea)
-            if d.isCode() and 'mkdata' not in d.getName():
+            if d.isCode() and '<mkdata>' not in d.getComment():
                 redundant = True
                 # MOVS R3, R3
                 content = d.getContent()
                 if content == 0x1B:
-                    print("%07X: mkdata (MOVS R3, R3)" % (ea))
+                    print("%07X: <mkdata> (MOVS R3, R3)" % (ea))
                 elif content == 0x09:
-                    print("%07X: mkdata (MOVS R1, R1)" % (ea))
+                    print("%07X: <mkdata> (MOVS R1, R1)" % (ea))
                 elif content == 0x1C00:
-                    print("%07X: mkdata (ADDS R0, R0, #0)" % (ea))
+                    print("%07X: <mkdata> (ADDS R0, R0, #0)" % (ea))
                 else:
                     redundant = False
 
                 if redundant:
-                    name = d.getName()
-                    if name:
-                        name = 'mkdata_' + name
+                    cmt = d.getComment()
+                    if cmt:
+                        cmt = '<mkdata> ' + cmt
                     else:
-                        name = 'mkdata_%X' % ea
-                    print("Renaming '%s'-> '%s'" % (d.getName(), name))
-                    idc.MakeName(ea, name)
+                        cmt = '<mkdata>'
+                    d.setComment(cmt)
             ea += d.getSize()
 
     @staticmethod

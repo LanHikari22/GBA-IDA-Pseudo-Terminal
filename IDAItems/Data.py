@@ -350,8 +350,8 @@ class Data:
     def _convertCode(self, ea, disasm):
         """
         modifies code data items so that they're compatible with arm-none-eabi-gcc
-        Some labels are reserved for conversion actions:
-            mkdata:  Converts the code to data, this is necessary when encountering redundant instructions.
+        Some comment tags are reserved for conversion actions:
+            <mkdata>:  Converts the code to data, this is necessary when encountering redundant instructions.
         :param ea: (long) addr of disasm
         :param disasm: (str) disasm to transform
         :return: (str) converted disasm
@@ -386,8 +386,8 @@ class Data:
                 output = "DCW 0x%X // %s" % (self.getContent(), output)
                 output = self._convertData(output)
 
-            # parse label commands -- if it's a redundant instruction, it should have the mkdata tag in it
-            if self.getName().startswith("mkdata"):
+            # parse comment commands -- if it's a redundant instruction, it should have the <mkdata> tag in it
+            if "<mkdata>" in self.getComment():
                 output = "DCW 0x%X // %s" % (self.getContent(), output)
                 output = self._convertData(output)
 
