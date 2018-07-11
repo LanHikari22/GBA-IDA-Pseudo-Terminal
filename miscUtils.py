@@ -35,11 +35,12 @@ class misc(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.rngmkd, "rngmkd", "<start_ea> <end_ea>")
 
     @staticmethod
-    def test():
-        for ea, name in idautils.Names():
-            if "mkdata_" in name:
-                print("%07X: delete name %s" % (ea, name))
-                idc.MakeName(ea, '' )
+    def test(n):
+        ea = idc.here()
+        for i in range(n):
+            ea_str = srchUtils.srch().nextfakeinst(ea)
+            print(ea_str)
+            ea = int(ea_str, 16)
 
     @staticmethod
     def time(func, *args, **kwargs):
