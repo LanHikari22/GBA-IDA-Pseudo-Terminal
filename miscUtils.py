@@ -1,7 +1,9 @@
 # @file miscUtils
 # whatever utilities go here! sometimes for testing, sometimes for convenience!
+
 import idaapi
 import idautils
+import time
 
 import srchUtils
 from srchUtils import srch
@@ -25,6 +27,7 @@ class misc(TerminalModule.TerminalModule, object):
         super(misc, self).__init__(fmt)
 
         self.registerCommand(self, self.test, "test", "...")
+        self.registerCommand(self, self.time, "time", "<func> <func_args>")
         self.registerCommand(self, self.fnrepl, "fnrepl", "<start_ea> <end_ea> <oldstr> <newstr>")
         self.registerCommand(self, self.plcv, "plcv", "<ea>")
         self.registerCommand(self, self.nlrepl, "nlrepl", "<oldStr> <newStr>")
@@ -35,6 +38,19 @@ class misc(TerminalModule.TerminalModule, object):
         for i in range(n):
             next = int(srchUtils.srch().nextascii(), 16)
             idc.MakeWord(next)
+
+    @staticmethod
+    def time(func, *args, **kwargs):
+        """
+        Calls and times the passed in function in ms
+        :param func: the function to call and time
+        :param args: arguments to the function
+        :param kwargs: keyworded arguments to the function
+        """
+        stopwatch_ms = int(round(time.time()*1000))
+        func(*args, **kwargs)
+        stopwatch_ms = int(round(time.time()*1000)) - stopwatch_ms
+        print("Execution time: %s ms" % (stopwatch_ms))
 
     @staticmethod
     def fnrepl(start_ea, end_ea, oldstr, newstr, log=True):

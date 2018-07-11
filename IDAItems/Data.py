@@ -416,12 +416,11 @@ class Data:
         return disasm.replace(';', ' //', disasm.count(';'))
         pass
 
-    def _getDataDisasm(self, ea, dispLabel=True, elemsPerLine=-1):
+    def _getDataDisasm(self, ea, elemsPerLine=-1):
         """
         You cannot get array data using getdisasm. The disassembly has to be extracted differently.
         This identifies the data in question, and gets its disassembly
         :param ea: the effective address of the item to get the disassembly of
-        :param dispLabel: if a data element is a pointer, the name (or name+1) is displayed instead
         :param elemsPerLine: if 0, maximum will be used. if <0, it'll be parsed from the database. otherwise, it's n.
         :return: the disasssembly of the data item
         """
@@ -436,7 +435,7 @@ class Data:
             if self.isPointer(content):
                 disasm = idc.GetDisasm(ea)  # very simple, this works.
             else:
-                # build the disassembly
+                # build the disassembly: this is for none-pointer symbols found in IDA (ex: word_0)
                 if idc.is_byte(flags): op = 'DCB'
                 elif idc.is_word(flags): op = 'DCW'
                 else: op = 'DCD'
@@ -462,11 +461,6 @@ class Data:
 
             # whether to display a name, or data, is determiend by the xrefs from this item!
             xrefs = self.getXRefsFrom()
-            # determine if this is normal data, or pointers if dispLabel is enabled
-            if dispLabel:
-                isPointerArr = self.hasPointer()
-            else:
-                isPointerArr = False
 
             # generate disassembly for array
             disasm = dataType + ' '
@@ -476,17 +470,19 @@ class Data:
                 if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
                 # add element and increment counter until new line
                 # if it's a pointer and defined as an xref, display its label not just the number
-                if isPointerArr and self.isPointer(elem) and (elem in xrefs[0] or elem in xrefs[1]):
-                    name = idc.Name(elem)
+                if self.isPointer(elem) and (elem in xrefs[1] or elem in xrefs[0]):
+                    # TODO: maybe you ahould get the name of Data.Data(elem) also, for +index
+                    elemEA = Data(elem).ea
+                    name = idc.Name(elemEA)
                     if name:
-                        disasm += "%s, " % name
-                    else:
-                        # try name+1 in case of CPU mode differences in address
-                        name = idc.get_name(elem - 1)
-                        if name:
-                            disasm += "%s+1, " % name
+                        offset = elem - elemEA
+                        if offset != 0:
+                            offset = '+%d' % offset
                         else:
-                            disasm += '0x%X, ' % elem
+                            offset = ''
+                        disasm += "%s%s, " % (name, offset)
+                    else:
+                        disasm += '0x%X, ' % elem
                 else:
                     disasm += '0x%X, ' % elem
 
@@ -513,27 +509,28 @@ class Data:
         return disasm
 
     def hasPointer(self):
+        """
+        determines whether the item has a pointer in its content
+        :return:
+        """
         flags = idc.GetFlags(self.ea)
         output = False
         content = self.getContent()
-        try:
+        # only arrays may have pointers,
+        if type(content) == list:
             for word_ea in content:
                 if self.isPointer(word_ea):
                     output = True
-        except TypeError:
-            # in case the data item is not an array
-            pass
+        elif type(content) == int or type(content) == long:
+            output = self.isPointer(content)
         return output
 
     def isPointer(self, ea):
-        # to account for the fact that the address can have a +1 or not for CPU mode switch
-        # in case of +1 for different CPU mode, both ea and ea-1 are considered
-        # any value less than 0x01000000 is likely not a pointer
-        output = ea >= 0x01000000 and (
-            idaapi.get_name(ea) != '' or
-            idaapi.get_name(ea - 1) != '' or
-            idaapi.get_name(Data(ea).ea) != '')
-        return output
+        # an ea is a pointer if it has a label, and if it has a possible value for physical addressing
+        # any value less than 0x02000000 or greater than 0x09000000 is unlikely a pointer
+        if 0x02000000 <= ea <= 0x09000000 and idc.Name(Data(ea).ea) != '':
+            return True
+        return False
 
     def _getPoolDisasm(self):
         # type: () -> str

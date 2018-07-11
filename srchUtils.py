@@ -58,7 +58,7 @@ class srch(TerminalModule.TerminalModule, object):
         :return: hex formatted str of the address of the next ascii item
         """
         # don't count this item
-        ea += Data.Data(ea).getSize()
+        ea = Data.Data(ea).ea + Data.Data(ea).getSize()
         output = idaapi.BADADDR
         while ea < self.end_ea:
             d = Data.Data(ea)
@@ -68,3 +68,12 @@ class srch(TerminalModule.TerminalModule, object):
                 break
             ea += d.getSize()
         return '%07X' % output
+
+    def nextstkfunc(self, ea=idc.here()):
+        # type: (int) -> str
+        """
+        Finds the next function that uses stack variables
+        :param ea: the current address to search from
+        :return: hex formatted ea of next stack function
+        """
+        raise(NotImplemented())
