@@ -202,6 +202,7 @@ class Function:
     def getSize(self, withPool=False):
         """
         Computes the size of the function the first time this is called, and caches that computation for later
+        The pool can be forcibly ended if encountered data with a label starting with 'endpool_'
         :param withPool: (bool) somewhat of a heuristic. Computes the pool size as simply the amount of bytes since
                          the function's code portion finished (endEA) until a new code head is detected
         :return:  Returns the size of the Function in bytes: EndEA - StartEA (if no pool selected, otherwise + pool)
@@ -211,7 +212,12 @@ class Function:
             return self._size
         except AttributeError:
             head = self.func.end_ea
-            while not idc.isCode(idc.GetFlags(head)):
+            #
+            while not idc.isCode(idc.GetFlags(head)) :
+                # manual pool computation, trust and end pool!
+                if idc.Name(head).startswith('endpool_'):
+                    break
+                # advance to next data element
                 head += idc.get_item_size(head)
             self._size = head - self.func.start_ea
             return self._size

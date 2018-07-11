@@ -462,6 +462,9 @@ class Data:
             # whether to display a name, or data, is determiend by the xrefs from this item!
             xrefs = self.getXRefsFrom()
 
+            # only bother to check for names if it's an array of words
+            wordArray = dataType == 'DCD'
+
             # generate disassembly for array
             disasm = dataType + ' '
             elemIndex = 0
@@ -470,7 +473,7 @@ class Data:
                 if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
                 # add element and increment counter until new line
                 # if it's a pointer and defined as an xref, display its label not just the number
-                if self.isPointer(elem) and (elem in xrefs[1] or elem in xrefs[0]):
+                if wordArray and self.isPointer(elem) and (elem in xrefs[1] or elem in xrefs[0]):
                     # TODO: maybe you ahould get the name of Data.Data(elem) also, for +index
                     elemEA = Data(elem).ea
                     name = idc.Name(elemEA)

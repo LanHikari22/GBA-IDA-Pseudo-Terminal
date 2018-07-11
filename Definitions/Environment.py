@@ -14,7 +14,11 @@ env['compareBinPath'] = ''
 env['dismProjPath'] = ''
 # disassembled asm files go here
 env['asmPath'] = ''
+# extracted binaries go here
+env['binPath'] = ''
 # the path for where *.inc files are found to contain external symbols for disassembled asm files
 env['externsPath'] = ''
 # dictionary of filename and tuple of addresses: (Ex: {"start":(0x8000000, 0x80002CC)}
 env['asmFiles'] = None
+# dictionary of filename and tuple of addresses. This won't be disassembled into *.s. Only binary extracted.
+env['binFiles'] = None

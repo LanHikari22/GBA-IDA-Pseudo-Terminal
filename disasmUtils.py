@@ -19,6 +19,7 @@ class dis(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.rng, "rng", "<start_ea> <end_ea>")
         self.registerCommand(self, self.rngext, "rngext", "<start_ea> <end_ea>")
         self.registerCommand(self, self.push, "push", "")
+        self.registerCommand(self, self.extract, "extract", "")
 
 
     @staticmethod
@@ -136,7 +137,7 @@ class dis(TerminalModule.TerminalModule, object):
         asmPath = self.get('dismProjPath') + self.get('asmPath')
         externsPath = self.get('dismProjPath') + self.get('externsPath')
         if not asmFiles or not asmPath or not externsPath:
-            print('ERROR: environmental variables for asmFiles, dismProjPath, asmPath, and externsPath'
+            print('ERROR: environmental variables for dismProjPath, asmFiles, asmPath, and externsPath'
                   + ' must be provided.')
             return
 
@@ -159,3 +160,29 @@ class dis(TerminalModule.TerminalModule, object):
             incfile.write(externs)
             incfile.close()
         print("Push complete!")
+
+    def extract(self):
+        """
+        Extracts all binary ranges specified in env['binFiles'] into *.bin files in the folder env['binPath']
+        """
+        # grab necessary variables from the environment and assert that they were given
+        binFiles = self.get('binFiles')
+        binPath = self.get('dismProjPath') + self.get('binPath')
+        if not binFiles or not binPath:
+            print('ERROR: environmental variables for dismProjPath, binFiles, and binPath'
+                  + ' must be provided.')
+            return
+
+        keys = binFiles.keys()
+        keys.sort()
+        for file in keys:
+            # get bytes in specified range
+            bytes = idc.get_bytes(binFiles[file][0], binFiles[file][1] - binFiles[file][0])
+
+            # write bytes to bin file
+            bpath = binPath + file + '.bin'
+            print("Extracting %s.bin into %s... " % (file, bpath))
+            binfile = open(bpath, 'wb')
+            binfile.write(bytes)
+            binfile.close()
+        print("Extraction complete!")
