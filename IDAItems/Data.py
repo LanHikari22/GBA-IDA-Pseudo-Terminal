@@ -8,6 +8,7 @@ import idc
 import re
 
 import IDAItems
+import miscUtils
 
 
 class DataException(Exception):
@@ -582,22 +583,26 @@ class Data:
             if words[2][0] != '=':
                 raise (DataException('%07X: found = in a weird place in PC-relative load' % self.ea))
             # grab the value in the =. That content must be consistent with pool_ea's content
-            instName = words[2][1:]
+            poolName = words[2][1:]
             # filter out potential ()s
-            if instName[0] == '(':
-                instName = instName[1:-1]
+            if poolName[0] == '(':
+                poolName = poolName[1:-1]
             # filter out index
-            if '+' in instName:
-                instName = instName[:instName.index('+')]
-            for xref in xrefsFrom[1]:
-                # there are always two options, the content, or teh pool_ea. Make sure we're not
-                # grabbing content
-                if idc.Name(xref) and idc.Name(xref) != instName:
-                    pool_ea = xref
-                    break
+            if '+' in poolName:
+                poolName = poolName[:poolName.index('+')]
+            # if there's only one xref, no inconsistency. simply grab it
+            if len(xrefsFrom[1]) == 1:
+                pool_ea = xrefsFrom[1][0]
+            else:
+                for xref in xrefsFrom[1]:
+                    # there are always two options, the content, or the pool_ea. Make sure we're not
+                    # grabbing content
+                    if idc.Name(xref) and idc.Name(xref) != poolName:
+                        pool_ea = xref
+                        break
         # we're using the LDR RX, name format.
         else:
-            # TODO: this format now breaks!
+            # TODO: [BUG] this format now breaks!
             # the correct xref is the one with the identical name in the instruction
             for xref in xrefsFrom[1]:
                 d = Data(xref)
