@@ -321,6 +321,8 @@ class Function:
             ea = self.func_ea
             base = -1
 
+            # TODO: maybe use get_min_spd_ea(func_ea) to get the base pointer? this stands for stack pointer delta!
+
             # search function instructions to find base (TODO: hacky, but i dunno how else to find base yet)
             while ea < self.func_ea + self.getSize():
                 d = Data.Data(ea)

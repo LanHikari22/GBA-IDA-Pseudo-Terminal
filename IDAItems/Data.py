@@ -530,8 +530,14 @@ class Data:
         return output
 
     def isPointer(self, ea):
-        # an ea is a pointer if it has a label, and if it has a possible value for physical addressing
-        # any value less than 0x02000000 or greater than 0x09000000 is unlikely a pointer
+        """
+        an ea is a pointer if it has a label, and if it has a possible value for physical addressing.
+        any value less than 0x02000000 or greater than 0x0E010000 is not likely a pointer as per the
+        gbatek documentation. values from the range [0, 0x3FFF] are BIOS pointers, but this is a very small minority
+        and is not mainly manipulated by game logic like other pointers
+        :param ea: linear address of the data item
+        :return: True if it's a pointer
+        """
         if 0x02000000 <= ea <= 0x09000000 and idc.Name(Data(ea).ea) != '':
             return True
         return False

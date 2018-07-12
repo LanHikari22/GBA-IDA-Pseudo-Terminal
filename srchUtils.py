@@ -27,6 +27,7 @@ class srch(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.nextfakeinst, "nextfakeinst", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextname, "nextname", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextknown, "nextknown", "<search_ea [ui=True]>")
+        self.registerCommand(self, self.nextred, "nextred", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextbin, "nextbin", "<search_ea> [ui=True")
 
         # figure out the very last ea reachable
@@ -108,7 +109,7 @@ class srch(TerminalModule.TerminalModule, object):
         :return: list of opcodes
         """
         # TODO: super clumsy, remove this with logical detection
-        return [0x0, 0x1, 0xA, 0x3, 0x4, 0x1B, 0x09, 0x19, 0x1C00, 0x1C1B, 0x1F9B]
+        return [0x0, 0x1, 0x3, 0x4, 0x09, 0xA, 0x19, 0x1B, 0x1C00, 0x1C1B, 0x1F9B, 0x4425]
 
 
     def nextname(self, ea, ui=True):
@@ -199,12 +200,23 @@ class srch(TerminalModule.TerminalModule, object):
         idaapi.jumpto(start_ea)
         return '0x%07X, 0x%07X' % (start_ea, end_ea)
 
-    def nextstkfunc(self, ea, ui=True):
-        # type: (int) -> str
+    def nextred(self, ea, ui=True):
         """
-        Finds the next function that uses stack variables
-        :param ea: the current address to search from
+        Looks for code items outside function items. The first detected is returned
+        :param ea: ea to start searching from
         :param ui: if True, jump to address automatically
-        :return: hex formatted ea of next stack function
+        :return: hex formatted ea of next name
         """
-        raise(NotImplemented())
+        # don't count this item
+        ea = Data.Data(ea).ea + Data.Data(ea).getSize()
+        output = idaapi.BADADDR
+        while ea < self.end_ea:
+            d = Data.Data(ea)
+            if d.isCode() and not Function.isFunction(d.ea):
+                output = ea
+                break
+            ea += d.getSize()
+        if ui: idaapi.jumpto(ea)
+        return '%07X' % output
+
+

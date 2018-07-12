@@ -36,11 +36,7 @@ class misc(TerminalModule.TerminalModule, object):
 
     @staticmethod
     def test(n):
-        ea = idc.here()
-        for i in range(n):
-            ea_str = srchUtils.srch().nextfakeinst(ea)
-            print(ea_str)
-            ea = int(ea_str, 16)
+        idc.get_color(here(), )
 
     @staticmethod
     def time(func, *args, **kwargs):
