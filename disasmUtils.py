@@ -114,8 +114,9 @@ class dis(TerminalModule.TerminalModule, object):
 
     def rnglinkedext(self, start_ea, end_ea):
         """
-        The same as rngext(), except, where it can, it includes header files instead!
+        The same as rngext(), except, where it can, it includes header files too!
         This is based on the asmFiles found in env['asmFiles']
+        when a header file is included, used symbols from the header file are shown commented out after it
         :param start_ea: start ea of the range, inclusive
         :param end_ea: end ea of the range, exclusive
         :return: a string containing all the external symbol .equs and .includes
@@ -133,7 +134,7 @@ class dis(TerminalModule.TerminalModule, object):
             return
 
         xrefs = dis.rngext(start_ea, end_ea, toStr=False)
-        includes = []
+        includes = {}
         # compute includes, and remove xrefs inside them
         for xref in xrefs:
             # figure out if it's in any include (within asmFile ranges)
@@ -144,11 +145,17 @@ class dis(TerminalModule.TerminalModule, object):
                 if asmFiles[file][0] <= xref < asmFiles[file][1]:
                     xrefs.remove(xref)
                     if file not in includes:
-                        includes.append(file)
+                        includes[file] = [xref]
+                    else:
+                        includes[file].append(xref)
         output = ''
-        # output includes
-        for include in includes:
+        # output includes and specific usages
+        for include in includes.keys():
             output += '.include "%s.inc"\n' % (include)
+            for xref in includes[include]:
+                output += '// .equ %s, 0x%07X\n' % (Data.Data(xref).getName(), xref)
+            output += '\n'
+
         output += '\n'
 
         # output remaining xrefs
