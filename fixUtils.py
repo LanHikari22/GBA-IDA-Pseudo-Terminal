@@ -165,7 +165,7 @@ class fix(TerminalModule.TerminalModule, object):
                 while ea < func_ea + Function.Function(func_ea).getSize(withPool=False):
                     d = Data.Data(ea)
                     for name, off in stackVars:
-                        if name != ' s' and name in d.getFormattedDisasm():
+                        if name != ' s' and name in d.getOrigDisasm():
                             changedStackVar = True
                             if not madeChanges: madeChanges = True
                             idc.op_hex(d.ea, 1)

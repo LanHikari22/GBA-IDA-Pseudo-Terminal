@@ -26,9 +26,9 @@ class srch(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.nextascii, "nextascii", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextfakeinst, "nextfakeinst", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextname, "nextname", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextknown, "nextknown", "<search_ea [ui=True]>")
+        self.registerCommand(self, self.nextknown, "nextknown", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextred, "nextred", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextbin, "nextbin", "<search_ea> [ui=True")
+        self.registerCommand(self, self.nextbin, "nextbin", "<search_ea> [ui=True]")
 
         # figure out the very last ea reachable
         self.end_ea = 0
@@ -152,12 +152,14 @@ class srch(TerminalModule.TerminalModule, object):
 
     def nextbin(self, ea, ui=True):
         """
-        Finds the next big blob of data. The heuristic is it has to be at least 0x1000 in size
+        Finds the next big blob of data. The heuristic is it has to be at least sizeLimitHeuristic in size
         UI jumps to start_ea automatically.
         :param ea: ea to search from
         :param ui: if True, jump to address automatically
-        :return: tuple hex format of the bin range: (%07X, %07X)
+        :return: tuple hex format of the bin range and the size: (%07X, %07X, 0x$X)
         """
+        sizeLimitHeuristic = 0x1000
+
         # don't count this item
         ea = Data.Data(ea).ea + Data.Data(ea).getSize()
 
@@ -175,7 +177,7 @@ class srch(TerminalModule.TerminalModule, object):
         while ea < self.end_ea:
             d = Data.Data(ea)
 
-            if d.isData() or d.isUnknown():
+            if not d.isCode():
                 if state == st_start:
                     start_ea = ea
                     size = 0
@@ -188,7 +190,7 @@ class srch(TerminalModule.TerminalModule, object):
             if d.isCode():
                 # only end if valid size
                 if state == st_traverse:
-                    if size >= 0x1000:
+                    if size >= sizeLimitHeuristic:
                         state = st_end
                     else:
                         state = st_start
@@ -198,7 +200,7 @@ class srch(TerminalModule.TerminalModule, object):
 
             ea += d.getSize()
         idaapi.jumpto(start_ea)
-        return '0x%07X, 0x%07X' % (start_ea, end_ea)
+        return '0x%07X, 0x%07X, 0x%X' % (start_ea, end_ea, size)
 
     def nextred(self, ea, ui=True):
         """

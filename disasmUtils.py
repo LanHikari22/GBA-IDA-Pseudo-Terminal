@@ -36,21 +36,6 @@ class dis(TerminalModule.TerminalModule, object):
         ea = start_ea
         disasm = ''
 
-        # first, insert forward references. They are necessary for code using symbols within its file before definition
-        frefs = []
-        while ea < end_ea:
-                d = Data.Data(ea)
-                if d.getName():
-                    frefs.append((d.getName(), d.ea))
-                ea = ea + d.getSize()
-
-        # add forward references to disassembly
-        disasm += "// forward references\n"
-        for name, ea in frefs:
-            disasm += ".equ %s, 0x%08X\n" % (name, ea)
-        disasm += "\n"
-
-
         # disassemble the range
         ea = start_ea
         while ea < end_ea:
@@ -72,14 +57,12 @@ class dis(TerminalModule.TerminalModule, object):
 
 
     @staticmethod
-    def rngext(start_ea, end_ea):
-        # type: (int, int) -> str
+    def rngext(start_ea, end_ea, toStr=True):
         """
         creates .equs for all external symbols used in the range
         :param start_ea: start ea of the range, inclusive
         :param end_ea: end ea of the range, exclusive
-        :param inc: if False, symbols output in file.x format are output, else in file.inc
-        :return: a string containing all the external symbol .equs
+        :return: a string containing all the external symbol .equs, or just the refs if not disp
         """
         ea = start_ea
         xrefs = []
@@ -116,6 +99,9 @@ class dis(TerminalModule.TerminalModule, object):
 
         xrefs.sort()
 
+        if not toStr:
+            return xrefs
+
         output = ''
         # output file formats to include symbols into linking process
         for xref in xrefs:
@@ -126,39 +112,141 @@ class dis(TerminalModule.TerminalModule, object):
 
         return output
 
+    def rnglinkedext(self, start_ea, end_ea):
+        """
+        The same as rngext(), except, where it can, it includes header files instead!
+        This is based on the asmFiles found in env['asmFiles']
+        :param start_ea: start ea of the range, inclusive
+        :param end_ea: end ea of the range, exclusive
+        :return: a string containing all the external symbol .equs and .includes
+        """
+        # grab necessary variables from the environment and assert that they were given
+        err_msg = 'ERROR: environmental variables for asmFiles' \
+                  + ' must be provided.'
+        try:
+            asmFiles = self.get('asmFiles')
+            if not asmFiles:
+                print(err_msg)
+                return
+        except TypeError:
+            print(err_msg)
+            return
+
+        xrefs = dis.rngext(start_ea, end_ea, toStr=False)
+        includes = []
+        # compute includes, and remove xrefs inside them
+        for xref in xrefs:
+            # figure out if it's in any include (within asmFile ranges)
+            keys = asmFiles.keys()
+            keys.sort()
+            for file in keys:
+                # if xref is within file range
+                if asmFiles[file][0] <= xref < asmFiles[file][1]:
+                    xrefs.remove(xref)
+                    if file not in includes:
+                        includes.append(file)
+        output = ''
+        # output includes
+        for include in includes:
+            output += '.include "%s.inc"\n' % (include)
+        output += '\n'
+
+        # output remaining xrefs
+        for xref in xrefs:
+            d = Data.Data(xref)
+            name = d.getName()
+            xref = d.ea
+            output += '.equ %s, 0x%07X\n' % (name, xref)
+        return output
+
+
+    @staticmethod
+    def rnginc(start_ea, end_ea):
+        """
+        Creates includes as well as forward references for the range
+        The symbols are .equ defined, and represent the symbols defined within the range
+        :param start_ea: linear address of the start of the range
+        :param end_ea: linear address of the end of the range, exclusive
+        :return: a series of .equ's representing the public (and private) interface of the range
+        """
+        ea = start_ea
+        pubrefs = []
+        fwdrefs = []
+        while ea < end_ea:
+                d = Data.Data(ea)
+                if d.getName():
+                    # check xrefs to the item, if any is outside the range, it's a public reference
+                    isPublic = False
+                    xrefsTo = d.getXRefsTo()
+                    for cref in xrefsTo[0]:
+                        if cref < start_ea or cref >= end_ea:
+                            isPublic = True
+                    for dref in xrefsTo[1]:
+                        if dref < start_ea or dref >= end_ea:
+                            isPublic = True
+                    if isPublic:
+                        pubrefs.append((d.getName(), d.ea))
+                    else:
+                        fwdrefs.append((d.getName(), d.ea))
+                ea = ea + d.getSize()
+
+        # string build includes
+        inc = '// Public Interface\n'
+        for name, ea in pubrefs:
+            inc += ".equ %s, 0x%07X\n" % (name, ea)
+        inc += "\n// Forward Reference\n"
+        for name, ea in fwdrefs:
+            inc += ".equ %s, 0x%07X\n" % (name, ea)
+        inc += "\n"
+        return inc
+
     def push(self):
         """
-        Automatcally generates disassembly and external symbols for all asmFiles specified
-        in env['asmFiles']
+        Automatcally generates disassembly, header, and external symbols for all asmFiles specified
+        in env['asmFiles'] and updates the files in the project folder specified
         """
 
-        # grab necessary variables from the envrionment and assert that they were given
-        asmFiles = self.get('asmFiles')
-        asmPath = self.get('dismProjPath') + self.get('asmPath')
-        externsPath = self.get('dismProjPath') + self.get('externsPath')
-        if not asmFiles or not asmPath or not externsPath:
-            print('ERROR: environmental variables for dismProjPath, asmFiles, asmPath, and externsPath'
-                  + ' must be provided.')
+        # grab necessary variables from the environment and assert that they were given
+        err_msg = 'ERROR: environmental variables for dismProjPath, asmFiles, asmPath, incPath, and externsPath' \
+                      + ' must be provided.'
+        try:
+            asmFiles = self.get('asmFiles')
+            asmPath = self.get('dismProjPath') + self.get('asmPath')
+            incPath = self.get('dismProjPath') + self.get('incPath')
+            externsPath = self.get('dismProjPath') + self.get('externsPath')
+            if not asmFiles or not asmPath or not externsPath or not incPath:
+                print(err_msg)
+                return
+        except TypeError:
+            print(err_msg)
             return
 
         keys = asmFiles.keys()
         keys.sort()
         for file in keys:
-            # generate disassembly and external symbols output
-            disasm = self.rng(asmFiles[file][0], asmFiles[file][1])
-            externs = self.rngext(asmFiles[file][0], asmFiles[file][1])
+            # include header into disassembly
+            disasm = '.include "%s.inc"\n\n' % (file)
             # write disassembly to file
             spath = asmPath + file + '.s'
-            print("Disassembling %s.s into %s... " % (file, spath))
+            print("> Disassembling %s.s into %s... " % (file, spath))
+            disasm += self.rng(asmFiles[file][0], asmFiles[file][1])
             asmfile = open(spath, 'w')
             asmfile.write(disasm)
             asmfile.close()
-            # write externs to file
-            incpath = externsPath + file + '.inc'
-            print("Defining external symbols for %s.s in %s..." % (file, incpath))
+            # write inc file
+            incpath = incPath + file + '.inc'
+            print("Defining header symbols for %s.s in %s..." % (file, incpath))
+            incs = self.rnginc(asmFiles[file][0], asmFiles[file][1])
             incfile = open(incpath, 'w')
-            incfile.write(externs)
+            incfile.write(incs)
             incfile.close()
+            # write externs to file
+            extpath = externsPath + file + '.inc'
+            print("Defining external symbols for %s.s in %s..." % (file, extpath))
+            externs = self.rnglinkedext(asmFiles[file][0], asmFiles[file][1])
+            extfile = open(extpath, 'w')
+            extfile.write(externs)
+            extfile.close()
         print("Push complete!")
 
     def extract(self):
