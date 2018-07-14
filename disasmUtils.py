@@ -82,7 +82,7 @@ class dis(TerminalModule.TerminalModule, object):
                 if (idc.isCode(idc.GetFlags(xref)) or idc.isCode(idc.GetFlags(xref-1))) and xref & 1 == 1:
                     xref = xref - 1
 
-                if ((xref < start_ea or xref >= end_ea) # filter internal (not external; within range)
+                if ((xref <= start_ea or xref > end_ea) # filter internal (not external; within range)
                         and xref not in xrefs): # filter duplicate
                     xrefs.append(xref)
             for xref in d.getXRefsFrom()[1]:
@@ -122,11 +122,11 @@ class dis(TerminalModule.TerminalModule, object):
         :return: a string containing all the external symbol .equs and .includes
         """
         # grab necessary variables from the environment and assert that they were given
-        err_msg = 'ERROR: environmental variables for asmFiles' \
+        err_msg = 'ERROR: environmental variables for gameFiles' \
                   + ' must be provided.'
         try:
-            asmFiles = self.get('asmFiles')
-            if not asmFiles:
+            gameFiles = self.get('gameFiles')
+            if not gameFiles:
                 print(err_msg)
                 return
         except TypeError:
@@ -138,20 +138,21 @@ class dis(TerminalModule.TerminalModule, object):
         # compute includes, and remove xrefs inside them
         for xref in xrefs:
             # figure out if it's in any include (within asmFile ranges)
-            keys = asmFiles.keys()
+            keys = gameFiles.keys()
             keys.sort()
             for file in keys:
-                # if xref is within file range
-                if asmFiles[file][0] <= xref < asmFiles[file][1]:
-                    xrefs.remove(xref)
-                    if file not in includes:
-                        includes[file] = [xref]
-                    else:
-                        includes[file].append(xref)
+                if '.s' in file:
+                    # if xref is within file range
+                    if gameFiles[file][0] <= xref < gameFiles[file][1]:
+                        xrefs.remove(xref)
+                        if file not in includes:
+                            includes[file] = [xref]
+                        else:
+                            includes[file].append(xref)
         output = ''
         # output includes and specific usages
         for include in includes.keys():
-            output += '.include "%s.inc"\n' % (include)
+            output += '.include "%s.inc"\n' % (include[:include.index('.')])
             for xref in includes[include]:
                 output += '// .equ %s, 0x%07X\n' % (Data.Data(xref).getName(), xref)
             output += '\n'
@@ -217,43 +218,51 @@ class dis(TerminalModule.TerminalModule, object):
         err_msg = 'ERROR: environmental variables for dismProjPath, asmFiles, asmPath, incPath, and externsPath' \
                       + ' must be provided.'
         try:
-            asmFiles = self.get('asmFiles')
+            gameFiles = self.get('gameFiles')
             asmPath = self.get('dismProjPath') + self.get('asmPath')
             incPath = self.get('dismProjPath') + self.get('incPath')
             externsPath = self.get('dismProjPath') + self.get('externsPath')
-            if not asmFiles or not asmPath or not externsPath or not incPath:
+            if not gameFiles or not asmPath or not externsPath or not incPath:
                 print(err_msg)
                 return
         except TypeError:
             print(err_msg)
             return
 
-        keys = asmFiles.keys()
+        keys = gameFiles.keys()
         keys.sort()
         for file in keys:
-            # include header into disassembly
-            disasm = '.include "%s.inc"\n\n' % (file)
-            # write disassembly to file
-            spath = asmPath + file + '.s'
-            print("> Disassembling %s.s into %s... " % (file, spath))
-            disasm += self.rng(asmFiles[file][0], asmFiles[file][1])
-            asmfile = open(spath, 'w')
-            asmfile.write(disasm)
-            asmfile.close()
-            # write inc file
-            incpath = incPath + file + '.inc'
-            print("Defining header symbols for %s.s in %s..." % (file, incpath))
-            incs = self.rnginc(asmFiles[file][0], asmFiles[file][1])
-            incfile = open(incpath, 'w')
-            incfile.write(incs)
-            incfile.close()
-            # write externs to file
-            extpath = externsPath + file + '.inc'
-            print("Defining external symbols for %s.s in %s..." % (file, extpath))
-            externs = self.rnglinkedext(asmFiles[file][0], asmFiles[file][1])
-            extfile = open(extpath, 'w')
-            extfile.write(externs)
-            extfile.close()
+            if '.s' in file:
+                filename = file[:file.index('.')]
+                # include header into disassembly
+                disasm = '.include "%s.inc"\n\n' % (filename)
+                # disasm += '.include "externs/%s.inc"\n\n' % (filename) # TODO: duplicate symbols/redefinition error??
+                # write disassembly to file
+                spath = asmPath + filename + '.s'
+                print("> Disassembling %s.s into %s... " % (filename, spath))
+                disasm += self.rng(gameFiles[file][0], gameFiles[file][1])
+                asmfile = open(spath, 'w')
+                asmfile.write(disasm)
+                asmfile.close()
+                # write inc file
+                incpath = incPath + filename + '.inc'
+                headerFilename = filename.upper().replace('/', '_')
+                print("Defining header symbols for %s.s in %s..." % (filename, incpath))
+                headerStart = '.ifndef INC_%s\n.equ INC_%s, 0\n\n' % (headerFilename, headerFilename)
+                headerEnd = '.endif // INC_%s\n' % (headerFilename)
+                incs = self.rnginc(gameFiles[file][0], gameFiles[file][1])
+                incfile = open(incpath, 'w')
+                incfile.write(headerStart + incs + headerEnd)
+                incfile.close()
+                # write externs to file
+                extpath = externsPath + filename + '.inc'
+                print("Defining external symbols for %s.s in %s..." % (filename, extpath))
+                headerStart = '.ifndef EXT_%s\n.equ EXT_%s, 0\n\n' % (headerFilename, headerFilename)
+                headerEnd = '.endif // EXT_%s\n' % (headerFilename)
+                externs = self.rnglinkedext(gameFiles[file][0], gameFiles[file][1])
+                extfile = open(extpath, 'w')
+                extfile.write(headerStart + externs + headerEnd)
+                extfile.close()
         print("Push complete!")
 
     def extract(self):
@@ -261,23 +270,24 @@ class dis(TerminalModule.TerminalModule, object):
         Extracts all binary ranges specified in env['binFiles'] into *.bin files in the folder env['binPath']
         """
         # grab necessary variables from the environment and assert that they were given
-        binFiles = self.get('binFiles')
+        gameFiles = self.get('gameFiles')
         binPath = self.get('dismProjPath') + self.get('binPath')
-        if not binFiles or not binPath:
-            print('ERROR: environmental variables for dismProjPath, binFiles, and binPath'
+        if not gameFiles or not binPath:
+            print('ERROR: environmental variables for dismProjPath, gameFiles, and binPath'
                   + ' must be provided.')
             return
 
-        keys = binFiles.keys()
+        keys = gameFiles.keys()
         keys.sort()
         for file in keys:
-            # get bytes in specified range
-            bytes = idc.get_bytes(binFiles[file][0], binFiles[file][1] - binFiles[file][0])
+            if '.bin' in file:
+                # get bytes in specified range
+                bytes = idc.get_bytes(gameFiles[file][0], gameFiles[file][1] - gameFiles[file][0])
 
-            # write bytes to bin file
-            bpath = binPath + file + '.bin'
-            print("Extracting %s.bin into %s... " % (file, bpath))
-            binfile = open(bpath, 'wb')
-            binfile.write(bytes)
-            binfile.close()
+                # write bytes to bin file
+                bpath = binPath + file
+                print("Extracting %s into %s... " % (file, bpath))
+                binfile = open(bpath, 'wb')
+                binfile.write(bytes)
+                binfile.close()
         print("Extraction complete!")

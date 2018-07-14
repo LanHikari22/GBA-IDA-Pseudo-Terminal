@@ -1,3 +1,4 @@
+import time
 import idaapi
 idaapi.require("miscUtils")
 idaapi.require("disasmUtils")
@@ -19,11 +20,11 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         # the module itelf also has a summary format, this is created by TerminalModule
         super(PseudoTerminal, self).__init__(fmt)
 
-        # eaach commznd in the module is added to the module help, and its __doc__ is
-        # given the member alias help instead
+        # each command in the module is added to the help and fmt records
         self.registerCommand(self, self.help, "help", "<command/module>")
         self.registerCommand(self, self.fmt, "fmt", "<command/module>")
         self.registerCommand(self, self.echo, "echo", "<msg>")
+        self.registerCommand(self, self.time, "time", "<func> <func_args>")
         self.registerCommand(self, self.clear, "clear", "")
         self.registerCommand(self, self.env, "env",  "<key>=<val>,...")
         self.registerCommand(self, self.clrenv, "clrenv", "")
@@ -48,6 +49,21 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         :param msg: message to echo
         """
         print(msg)
+
+    @staticmethod
+    def time(func, *args, **kwargs):
+        """
+        Calls and times the passed in function in ms
+        :param func: the function to call and time
+        :param args: arguments to the function
+        :param kwargs: keyworded arguments to the function
+        :return: what the called function returns
+        """
+        stopwatch_ms = int(round(time.time()*1000))
+        output = func(*args, **kwargs)
+        stopwatch_ms = int(round(time.time()*1000)) - stopwatch_ms
+        print("Execution time: %s ms" % (stopwatch_ms))
+        return output
 
     @staticmethod
     def clear(n=32):

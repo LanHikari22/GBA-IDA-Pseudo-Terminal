@@ -474,7 +474,8 @@ class Data:
                 if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
                 # add element and increment counter until new line
                 # if it's a pointer and defined as an xref, display its label not just the number
-                if wordArray and self.isPointer(elem) and (elem in xrefs[1] or elem in xrefs[0]):
+                # TODO: isPointer is a bottleneck call, so prefer to call it last
+                if wordArray and (elem in xrefs[1] or elem in xrefs[0]) and self.isPointer(elem):
                     # TODO: maybe you ahould get the name of Data.Data(elem) also, for +index
                     elemEA = Data(elem).ea
                     name = idc.Name(elemEA)
@@ -515,15 +516,17 @@ class Data:
     def hasPointer(self):
         """
         determines whether the item has a pointer in its content
-        :return:
+        :return: True if the content is or contains a pointer in it
         """
         flags = idc.GetFlags(self.ea)
         output = False
         content = self.getContent()
         # only arrays may have pointers,
         if type(content) == list:
+            # whether to display a name, or data, is determined by the xrefs from this item!
+            xrefs = self.getXRefsFrom()
             for word_ea in content:
-                if self.isPointer(word_ea):
+                if (word_ea in xrefs[1] or word_ea in xrefs[0]) and self.isPointer(word_ea):
                     output = True
         elif type(content) == int or type(content) == long:
             output = self.isPointer(content)
@@ -535,10 +538,11 @@ class Data:
         any value less than 0x02000000 or greater than 0x0E010000 is not likely a pointer as per the
         gbatek documentation. values from the range [0, 0x3FFF] are BIOS pointers, but this is a very small minority
         and is not mainly manipulated by game logic like other pointers
+        Never call this too much in arrays. It's a bottleneck function, it takes a while to get the name of an element
         :param ea: linear address of the data item
         :return: True if it's a pointer
         """
-        if 0x02000000 <= ea <= 0x09000000 and idc.Name(Data(ea).ea) != '':
+        if 0x02000000 <= ea <= 0x0E010000 and idc.Name(Data(ea).ea) != '':
             return True
         return False
 

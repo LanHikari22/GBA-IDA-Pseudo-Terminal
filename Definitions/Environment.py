@@ -20,7 +20,9 @@ env['binPath'] = ''
 env['incPath'] = ''
 # the path for where *.inc files are found to contain external symbols for disassembled asm files
 env['externsPath'] = ''
-# dictionary of filename and tuple of addresses: (Ex: {"start":(0x8000000, 0x80002CC)}
-env['asmFiles'] = None
-# dictionary of filename and tuple of addresses. This won't be disassembled into *.s. Only binary extracted.
-env['binFiles'] = None
+
+# dictionary of filename and tuple of addresses: (Ex: {"start.s":(0x8000000, 0x80002CC)}
+# The file extension determines the type disassembled.
+# file.s    | Code is disassembled
+# file.bin  | The binary content is extracted
+env['gameFiles'] = None
