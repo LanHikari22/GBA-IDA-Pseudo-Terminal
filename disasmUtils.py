@@ -49,8 +49,8 @@ class dis(TerminalModule.TerminalModule, object):
         keys = gameFiles.keys()
         keys.sort()
         for file in keys:
+            filename = file[:file.index('.')]
             if '.s' in file:
-                filename = file[:file.index('.')]
                 # include header into disassembly
                 disasm = '.include "%s.inc"\n\n' % (filename)
                 # disasm += '.include "externs/%s.inc"\n\n' % (filename) # TODO: duplicate symbols/redefinition error??
@@ -80,6 +80,7 @@ class dis(TerminalModule.TerminalModule, object):
                 extfile = open(extpath, 'w')
                 extfile.write(headerStart + externs + headerEnd)
                 extfile.close()
+
         print("Push complete!")
 
     def extract(self):
@@ -270,7 +271,7 @@ class dis(TerminalModule.TerminalModule, object):
         for include in includes.keys():
             output += '.include "%s.inc"\n' % (include[:include.index('.')])
             for xref in includes[include]:
-                output += '// .equ %s, 0x%07X\n' % (Data.Data(xref).getName(), xref)
+                output += '// .extern %s\n' % (Data.Data(xref).getName())
             output += '\n'
 
         output += '\n'
@@ -287,7 +288,7 @@ class dis(TerminalModule.TerminalModule, object):
     def rngInc(start_ea, end_ea):
         """
         Creates includes as well as forward references for the range
-        The symbols are .equ defined, and represent the symbols defined within the range
+        The symbols are .extern forwarded, and represent the symbols defined within the range
         :param start_ea: linear address of the start of the range
         :param end_ea: linear address of the end of the range, exclusive
         :return: a series of .equ's representing the public (and private) interface of the range
@@ -316,9 +317,9 @@ class dis(TerminalModule.TerminalModule, object):
         # string build includes
         inc = '// Public Interface\n'
         for name, ea in pubrefs:
-            inc += ".equ %s, 0x%07X\n" % (name, ea)
+            inc += ".extern %s\n" % (name)
         inc += "\n// Forward Reference\n"
         for name, ea in fwdrefs:
-            inc += ".equ %s, 0x%07X\n" % (name, ea)
+            inc += ".extern %s\n" % (name)
         inc += "\n"
         return inc

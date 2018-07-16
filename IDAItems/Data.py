@@ -382,6 +382,9 @@ class Data:
             except DataException:
                 pass
 
+            # convert immediate reference instructions
+            output = self._convertImmediateReferences(output)
+
             # if the instruction is an adc, replace it with a short
             if "ADR " in output:
                 output = "DCW 0x%X // %s" % (self.getContent(), output)
@@ -764,6 +767,10 @@ class Data:
         if words[0] != "ALIGN":
             return disasm
 
+        # filter comment
+        if ';' in words[1]:
+            words[1] = words[1][:words[1].index(';')]
+
         # obtain n from ALIGN <n>
         if "0x" in words[1]:
             n = int(words[1], 16)
@@ -811,4 +818,34 @@ class Data:
             if bytePadded:
                 disasm = disasm[:-2]
 
+        return disasm
+
+    def _convertImmediateReferences(self, disasm):
+        """
+        IDA puts references/symbols in immediete values as a way of indicating that those instructions
+        really are accessing that memory, but the compiler does not allow for this formatting, so the
+        immedietes are calculated and provided as hex instead
+        This converts instructions that look like this: ldr r2, [r2,#(dword_809EEF4+0x1F8 - 0x809f0e4)]
+        :param disasm: the source disassembly, it's returned if there's nothing to change
+        :return: the source disasm or the new one if there are changes to be made
+        """
+        if '#(' in disasm:
+            xrefs = self.getXRefsFrom()
+            hasImmRef = False
+            for xref in xrefs[1]:
+                if Data(xref).getName() in disasm:
+                    hasImmRef = True
+                    break
+            if not hasImmRef:
+                for xref in xrefs[0]:
+                    if Data.Data(xref).getName() in disasm:
+                        hasImmRef = True
+                        break
+            if hasImmRef:
+                # OK! we need to convert the immediate reference with a hexadecimal equivelant
+                expression = disasm[disasm.index('('):disasm.index(')')+1]
+                imms = idaapi.get_operand_immvals(self.ea, 1)
+                if len(imms) == 1:
+                    disasm = disasm[:disasm.index(expression)] + '0x%X' % (imms[0]) \
+                             + disasm[disasm.index(expression)+len(expression):] + ' // %s' % (expression)
         return disasm

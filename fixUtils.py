@@ -176,3 +176,4 @@ class fix(TerminalModule.TerminalModule, object):
             print("Removed all stack variable usages!")
         else:
             print("No stack variable usages to remove!")
+

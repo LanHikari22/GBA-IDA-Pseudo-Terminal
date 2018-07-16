@@ -27,8 +27,9 @@ class srch(TerminalModule.TerminalModule, object):
         self.registerCommand(self, self.nextfakeinst, "nextfakeinst", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextname, "nextname", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextknown, "nextknown", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextred, "nextred", "<search_ea> [ui=True]")
         self.registerCommand(self, self.nextbin, "nextbin", "<search_ea> [ui=True]")
+        self.registerCommand(self, self.nextred, "nextred", "<search_ea> [ui=True]")
+        self.registerCommand(self, self.nextimmref, "nextimmref", "<search_ea> [ui=True]")
 
         # figure out the very last ea reachable
         self.end_ea = 0
@@ -108,8 +109,9 @@ class srch(TerminalModule.TerminalModule, object):
         a list of detected instructions with different encoding using arm-none-eabi gcc
         :return: list of opcodes
         """
-        # TODO: super clumsy, remove this with logical detection
-        return [0x0, 0x1, 0x3, 0x4, 0x09, 0xA, 0x19, 0x1B, 0x1C00, 0x1C1B, 0x1F9B, 0x4425]
+        # TODO: super clumsy, replace this with logical detection
+        return [0x0, 0x1, 0x3, 0x4, 0x09, 0xA, 0x19, 0x1B, 0x1C00, 0x1C12, 0x1C1B, 0x1F9B, 0x4425,
+                0xB85D, 0xB88B, 0xB8A3]
 
 
     def nextname(self, ea, ui=True):
@@ -221,4 +223,33 @@ class srch(TerminalModule.TerminalModule, object):
         if ui: idaapi.jumpto(ea)
         return '%07X' % output
 
-
+    def nextimmref(self, ea, ui=True):
+        """
+        Finds the next occurrance of an immediate value being a reference, like
+        ldr r2, [r2,#(dword_809EEF4+0x1F8 - 0x809f0e4)]
+        :param ea: ea to start searching from
+        :param ui: if True, jump to address automatically
+        :return: hex formatted ea of next name
+        """
+        # don't count this item
+        ea = Data.Data(ea).ea + Data.Data(ea).getSize()
+        output = idaapi.BADADDR
+        while ea < self.end_ea:
+            d = Data.Data(ea)
+            if d.isCode() and '#' in d.getOrigDisasm():
+                disasm = d.getOrigDisasm()
+                # check out the xrefs from the data, see if it references to them
+                xrefs = d.getXRefsFrom()
+                for xref in xrefs[0]:
+                    if Data.Data(xref).getName() in disasm:
+                        output = ea
+                        break
+                for xref in xrefs[1]:
+                    if Data.Data(xref).getName() in disasm:
+                        output = ea
+                        break
+                if output != idaapi.BADADDR:
+                    break
+            ea += d.getSize()
+        if ui: idaapi.jumpto(ea)
+        return '%07X' % output
