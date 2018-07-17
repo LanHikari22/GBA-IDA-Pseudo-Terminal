@@ -38,8 +38,7 @@ class dis(TerminalModule.TerminalModule, object):
             gameFiles = self.get('gameFiles')
             asmPath = self.get('dismProjPath') + self.get('asmPath')
             incPath = self.get('dismProjPath') + self.get('incPath')
-            externsPath = self.get('dismProjPath') + self.get('externsPath')
-            if not gameFiles or not asmPath or not externsPath or not incPath:
+            if not gameFiles or not asmPath or not incPath:
                 print(err_msg)
                 return
         except TypeError:
@@ -53,33 +52,24 @@ class dis(TerminalModule.TerminalModule, object):
             if '.s' in file:
                 # include header into disassembly
                 disasm = '.include "%s.inc"\n\n' % (filename)
-                # disasm += '.include "externs/%s.inc"\n\n' % (filename) # TODO: duplicate symbols/redefinition error??
                 # write disassembly to file
                 spath = asmPath + filename + '.s'
-                print("> Disassembling %s.s into %s... " % (filename, spath))
+                print("> Disassembling %s.s to %s... " % (filename, spath))
                 disasm += self.rng(gameFiles[file][0], gameFiles[file][1])
                 asmfile = open(spath, 'w')
                 asmfile.write(disasm)
                 asmfile.close()
-                # write inc file
+                # write public interface and external symbol includes to header file
                 incpath = incPath + filename + '.inc'
+                print("Defining a header file for %s.s in %s..." % (filename, incpath))
                 headerFilename = filename.upper().replace('/', '_')
-                print("Defining header symbols for %s.s in %s..." % (filename, incpath))
                 headerStart = '.ifndef INC_%s\n.equ INC_%s, 0\n\n' % (headerFilename, headerFilename)
                 headerEnd = '\n.endif // INC_%s\n' % (headerFilename)
                 incs = self.rngInc(gameFiles[file][0], gameFiles[file][1])
-                incfile = open(incpath, 'w')
-                incfile.write(headerStart + incs + headerEnd)
-                incfile.close()
-                # write externs to file
-                extpath = externsPath + filename + '.inc'
-                print("Defining external symbols for %s.s in %s..." % (filename, extpath))
-                headerStart = '.ifndef EXT_%s\n.equ EXT_%s, 0\n\n' % (headerFilename, headerFilename)
-                headerEnd = '\n.endif // EXT_%s\n' % (headerFilename)
                 externs = self.rngSyncedExterns(gameFiles[file][0], gameFiles[file][1])
-                extfile = open(extpath, 'w')
-                extfile.write(headerStart + externs + headerEnd)
-                extfile.close()
+                incfile = open(incpath, 'w')
+                incfile.write(headerStart + incs + '\n' + externs + headerEnd)
+                incfile.close()
 
         print("Push complete!")
 
@@ -252,36 +242,46 @@ class dis(TerminalModule.TerminalModule, object):
 
         xrefs = dis.rngExterns(start_ea, end_ea, toStr=False)
         includes = {}
-        # compute includes, and remove xrefs inside them
+
+        # compute includes, and find the ones not declared anywhere
+        undeclaredXrefs = []
         for xref in xrefs:
             # figure out if it's in any include (within asmFile ranges)
             keys = gameFiles.keys()
             keys.sort()
+            isDeclared = False
             for file in keys:
                 if '.s' in file:
                     # if xref is within file range
                     if gameFiles[file][0] <= xref < gameFiles[file][1]:
-                        xrefs.remove(xref)
                         if file not in includes:
                             includes[file] = [xref]
                         else:
                             includes[file].append(xref)
-        output = ''
+                        # we found what file that xref belongs to now
+                        isDeclared = True
+                        break
+            # xref doesn't belong to any header file
+            if not isDeclared and xref not in undeclaredXrefs:
+                undeclaredXrefs.append(xref)
+
         # output includes and specific usages
+        output =  '/* External Symbols */\n'
         for include in includes.keys():
             output += '.include "%s.inc"\n' % (include[:include.index('.')])
             for xref in includes[include]:
                 output += '// .extern %s\n' % (Data.Data(xref).getName())
             output += '\n'
 
-        output += '\n'
-
         # output remaining xrefs
-        for xref in xrefs:
+        if undeclaredXrefs:
+            output += '\n/* Undeclared Symbols */\n'
+        for xref in undeclaredXrefs:
             d = Data.Data(xref)
             name = d.getName()
             xref = d.ea
             output += '.equ %s, 0x%07X\n' % (name, xref)
+
         return output
 
     @staticmethod
@@ -295,7 +295,7 @@ class dis(TerminalModule.TerminalModule, object):
         """
         ea = start_ea
         pubrefs = []
-        fwdrefs = []
+        # fwdrefs = []
         while ea < end_ea:
                 d = Data.Data(ea)
                 if d.getName():
@@ -310,16 +310,16 @@ class dis(TerminalModule.TerminalModule, object):
                             isPublic = True
                     if isPublic:
                         pubrefs.append((d.getName(), d.ea))
-                    else:
-                        fwdrefs.append((d.getName(), d.ea))
+                    # else:
+                    #     fwdrefs.append((d.getName(), d.ea))
                 ea = ea + d.getSize()
 
         # string build includes
-        inc = '// Public Interface\n'
+        inc = '/* Public Interface */\n'
         for name, ea in pubrefs:
             inc += ".extern %s\n" % (name)
-        inc += "\n// Forward Reference\n"
-        for name, ea in fwdrefs:
-            inc += ".extern %s\n" % (name)
+        # inc += "\n// Forward Reference\n"
+        # for name, ea in fwdrefs:
+        #     inc += ".extern %s\n" % (name)
         inc += "\n"
         return inc

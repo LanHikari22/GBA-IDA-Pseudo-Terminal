@@ -18,8 +18,6 @@ env['asmPath'] = ''
 env['binPath'] = ''
 # the path to put header *.inc files for the disassembly
 env['incPath'] = ''
-# the path for where *.inc files are found to contain external symbols for disassembled asm files
-env['externsPath'] = ''
 
 # dictionary of filename and tuple of addresses: (Ex: {"start.s":(0x8000000, 0x80002CC)}
 # The file extension determines the type disassembled.

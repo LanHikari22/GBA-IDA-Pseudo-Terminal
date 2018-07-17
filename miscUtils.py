@@ -118,7 +118,7 @@ class misc(TerminalModule.TerminalModule, object):
         :param ea: effective address to read at
         :param size: number of bytes to read
         :raises ValueError: if ea < ROM_SEG or if size < 0
-        :return: list of bytes representing the content read
+        :return: byte string representing the content read
         """
         # type: (int, int) -> list[int]
         if ea < Architecture.ROM_SEG or size < 0:
@@ -135,9 +135,8 @@ class misc(TerminalModule.TerminalModule, object):
 
         # close file handler and convert to byte str to bytes
         fh.close()
-        bytes = []
-        for char in data: bytes.append(ord(char))
-        return bytes
+
+        return data
 
     def rngmkd(self, start_ea, end_ea):
         """

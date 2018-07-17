@@ -118,6 +118,7 @@ class fix(TerminalModule.TerminalModule, object):
         """
         Changes all ARM within the specified range to THUMB
         :param ea: the address to start from
+        :return: False if no instruction found, else True
         """
         srch = srchUtils.srch()
         ea = int(srch.nextarm(start_ea, ui=False), 16)
@@ -130,8 +131,10 @@ class fix(TerminalModule.TerminalModule, object):
             ea = int(srch.nextarm(ea, ui=False), 16)
         if foundARM:
             print("Successfully changed ARM modes to THUMB!")
+            return True
         else:
-            print("no ARM instruction found!")
+            print("No ARM Instructions in range [%7X, %7X) found!" % (start_ea, end_ea))
+            return False
 
     @staticmethod
     def changeASCII(start_ea, ):

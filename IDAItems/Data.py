@@ -831,17 +831,8 @@ class Data:
         """
         if '#(' in disasm:
             xrefs = self.getXRefsFrom()
-            hasImmRef = False
-            for xref in xrefs[1]:
-                if Data(xref).getName() in disasm:
-                    hasImmRef = True
-                    break
-            if not hasImmRef:
-                for xref in xrefs[0]:
-                    if Data.Data(xref).getName() in disasm:
-                        hasImmRef = True
-                        break
-            if hasImmRef:
+            # if any references are present at this line
+            if len(xrefs[0]) != 0 or len(xrefs[1]) != 0:
                 # OK! we need to convert the immediate reference with a hexadecimal equivelant
                 expression = disasm[disasm.index('('):disasm.index(')')+1]
                 imms = idaapi.get_operand_immvals(self.ea, 1)
