@@ -55,7 +55,7 @@ class dis(TerminalModule.TerminalModule, object):
                 # write disassembly to file
                 spath = asmPath + filename + '.s'
                 print("> Disassembling %s.s to %s... " % (filename, spath))
-                disasm += self.rng(gameFiles[file][0], gameFiles[file][1])
+                disasm += self.rng(*gameFiles[file])
                 asmfile = open(spath, 'w')
                 asmfile.write(disasm)
                 asmfile.close()
@@ -65,8 +65,8 @@ class dis(TerminalModule.TerminalModule, object):
                 headerFilename = filename.upper().replace('/', '_')
                 headerStart = '.ifndef INC_%s\n.equ INC_%s, 0\n\n' % (headerFilename, headerFilename)
                 headerEnd = '\n.endif // INC_%s\n' % (headerFilename)
-                incs = self.rngInc(gameFiles[file][0], gameFiles[file][1])
-                externs = self.rngSyncedExterns(gameFiles[file][0], gameFiles[file][1])
+                incs = self.rngInc(*gameFiles[file])
+                externs = self.rngSyncedExterns(*gameFiles[file])
                 incfile = open(incpath, 'w')
                 incfile.write(headerStart + incs + '\n' + externs + headerEnd)
                 incfile.close()
@@ -174,8 +174,8 @@ class dis(TerminalModule.TerminalModule, object):
         ea = start_ea
         xrefs = []
 
-        # if there's a function at end_ea, include all of its refs
-        if Function.isFunction(end_ea):
+        # if end_ea is mid-way through a function, include all of its refs
+        if Function.isFunction(end_ea) and Function.Function(end_ea).func_ea != end_ea:
             f = Function.Function(end_ea)
             end_ea = f.func_ea + f.getSize(withPool=True)
 
