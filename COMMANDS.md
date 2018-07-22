@@ -12,6 +12,15 @@ This file contains documentation for all of the modules and commands available t
 - `env (key=Val)` Sets the value `val` to the environmental variable `key` in env. Multiple keys can be assigned with this (key1=val1, key2=val2, ...)
 - `clrenv ()` Clears the environment by setting all environmental variables back to their uninitialized state
 
+# misc
+Different kinds of commands and tools go here. No label. Just take a look, OK?
+- `gendocs ()` Actually generates the docs for this file!
+- `test (_)` For testing purposes. This function does whatever!
+- `fnrepl (start_ea, end_ea, oldstr, newstr)` Replaces a substring from a function name
+- `plcv (ea)` Converts and reports back the pool disassembly of the current code item at `ea`, if any
+- `nlrepl (oldStr, newStr)` Replaces a substring from a name found in the global NameList
+- `rngmkd (start_ea, end_ea)` Turns the data in the range to words. If not aligned with words, turns into bytes instead
+
 # dis
 This module contains utilities that help with disassembly exporting from IDA.
 The disassembly is in a format compatible with the none-arm-eabi-gcc assembler.
@@ -23,9 +32,3 @@ it will be disassembled completely, even if it exceeds that range).
 - `rngExterns (start_ea, end_ea)` Reports back all external symbols used by the specified range
 - `rngSyncedExterns (start_ea, end_ea)` Reports back all external symbols, but also specifies includes that expose those symbols from other env['gameFile'] ranges
 - `rngInc (start_ea, end_ea)` Reports back the exposed (or public) symbols of the range
-
-
-# misc
-Commands available directly through pt.
-- `echo(msg)` This simply prints the message sent to it.
-- `clear()` "Clears" the IDA python output window. Actually just prints new lines 32 times.
