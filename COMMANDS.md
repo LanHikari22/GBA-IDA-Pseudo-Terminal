@@ -105,3 +105,6 @@ This module contains tools to run on the database to fix problems all throughout
         ldr r2, [r2,#(dword_809EEF4+0x1F8 - 0x809f0e4)]
         
 - `ret (search_ea, ui=True)` Looks for the next data item that encodes a function return
+        - BX LR
+        - POP {..., PC} [Up to 50 gap insts] PUSH {..., LR}
+        - POP {R<X>} [Up to 5 gap insts] BX R<X>
