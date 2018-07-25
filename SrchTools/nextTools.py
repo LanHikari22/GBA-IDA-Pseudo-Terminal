@@ -1,35 +1,42 @@
-# @file srchUtils
-# utilities for searching for things in the IDB, as well as in binaries (and against the IDB) go here!
+# @file next
+# tools for finding the next occurrance of something
 import idaapi
 import idautils
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
+idaapi.require("IDAItems.InstDecoder")
 idaapi.require("TerminalModule")
 
 from Definitions import Architecture, Paths
 
 import idc
-from IDAItems import Function, Data
+from IDAItems import Function, Data, InstDecoder
 import TerminalModule
 
 
-class srch(TerminalModule.TerminalModule, object):
-    def __init__(self, fmt='[+] srch (IDB/binary searching utils)'):
+class next(TerminalModule.TerminalModule, object):
+    """
+    A collection of tools that find the next occurrance of a specific type of item
+    """
+
+    def __init__(self, fmt='[+] next (occurrence of something tools)'):
         """
         This module is responsible for printing disassemblies and necessary compoents
         of disassemblies
         """
-        super(srch, self).__init__(fmt)
+        super(next, self).__init__(fmt)
 
-        self.registerCommand(self, self.nextarm, "nextarm", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextascii, "nextascii", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextfakeinst, "nextfakeinst", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextname, "nextname", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextknown, "nextknown", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextbin, "nextbin", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextred, "nextred", "<search_ea> [ui=True]")
-        self.registerCommand(self, self.nextimmref, "nextimmref", "<search_ea> [ui=True]")
+        self.registerCommand(self.arm, "arm (search_ea, ui=True)")
+        self.registerCommand(self.ascii, "ascii (search_ea, ui=True)")
+        self.registerCommand(self.fakeinst, "fakeinst (search_ea, ui=True)")
+        self.registerCommand(self.name, "name (search_ea, ui=True)")
+        self.registerCommand(self.known, "known (search_ea, ui=True)")
+        self.registerCommand(self.bin, "bin (search_ea, ui=True)")
+        self.registerCommand(self.red, "red (search_ea, ui=True)")
+        self.registerCommand(self.immref, "immref (search_ea, ui=True)")
+        self.registerCommand(self.ret, "ret (search_ea, ui=True, hexOut=True)")
+        self.registerCommand(self.unkret, "unkret (search_ea, ui=True, hexOut=True)")
 
         # figure out the very last ea reachable
         self.end_ea = 0
@@ -37,8 +44,10 @@ class srch(TerminalModule.TerminalModule, object):
             if idc.SegEnd(seg) > self.end_ea:
                 self.end_ea = idc.SegEnd(seg)
 
+        # TODO: fix return type to just be output int, not str
 
-    def nextarm(self, ea, ui=True):
+
+    def arm(self, ea, ui=True):
         # type: (int) -> str
         """
         Finds the next ARM item, which has a Segment register value 'T' of 0
@@ -58,7 +67,7 @@ class srch(TerminalModule.TerminalModule, object):
             ea += d.getSize()
         return '%07X' % output
 
-    def nextascii(self, ea, ui=True):
+    def ascii(self, ea, ui=True):
         # type: (int) -> str
         """
         returns the next data item containing ascii characters (seems valid for utf too)
@@ -79,7 +88,7 @@ class srch(TerminalModule.TerminalModule, object):
         if ui: idaapi.jumpto(output)
         return '%07X' % output
 
-    def nextfakeinst(self, ea, ui=True):
+    def fakeinst(self, ea, ui=True):
         # type: (int) -> str
         """
         returns the next code item which is registered as a potential fake instruction.
@@ -114,7 +123,7 @@ class srch(TerminalModule.TerminalModule, object):
                 0xB85D, 0xB88B, 0xB8A3]
 
 
-    def nextname(self, ea, ui=True):
+    def name(self, ea, ui=True):
         """
         Finds the next ea with which a name exists
         :param ea: ea to start searching from
@@ -133,9 +142,9 @@ class srch(TerminalModule.TerminalModule, object):
         if ui: idaapi.jumpto(ea)
         return '%07X' % output
 
-    def nextknown(self, ea, ui=True):
+    def known(self, ea, ui=True):
         """
-        Finds the next ea with which a name exists
+        Finds the next ea of an item that is not unknown
         :param ea: ea to start searching from
         :param ui: if True, jump to address automatically
         :return: hex formatted ea of next name
@@ -152,7 +161,7 @@ class srch(TerminalModule.TerminalModule, object):
         if ui: idaapi.jumpto(ea)
         return '%07X' % output
 
-    def nextbin(self, ea, ui=True):
+    def bin(self, ea, ui=True):
         """
         Finds the next big blob of data. The heuristic is it has to be at least sizeLimitHeuristic in size
         UI jumps to start_ea automatically.
@@ -204,7 +213,7 @@ class srch(TerminalModule.TerminalModule, object):
         idaapi.jumpto(start_ea)
         return '0x%07X, 0x%07X, 0x%X' % (start_ea, end_ea, size)
 
-    def nextred(self, ea, ui=True):
+    def red(self, ea, ui=True):
         """
         Looks for code items outside function items. The first detected is returned
         :param ea: ea to start searching from
@@ -223,7 +232,7 @@ class srch(TerminalModule.TerminalModule, object):
         if ui: idaapi.jumpto(ea)
         return '%07X' % output
 
-    def nextimmref(self, ea, ui=True):
+    def immref(self, ea, ui=True):
         """
         Finds the next occurrance of an immediate value being a reference, like
         ldr r2, [r2,#(dword_809EEF4+0x1F8 - 0x809f0e4)]
@@ -253,3 +262,98 @@ class srch(TerminalModule.TerminalModule, object):
             ea += d.getSize()
         if ui: idaapi.jumpto(ea)
         return '%07X' % output
+
+    def ret(self, ea, ui=True, hexOut=True):
+        """
+        Looks for the next data item that encodes a function return
+        - BX LR
+        - PUSH {..., LR} [Up to 50 gap insts] POP {..., LR} (regLists must be matching)
+        - POP {R<X>} [Up to 5 gap insts] BX R<X>
+        :param ea: ea to start searching from
+        :param ui: if True, jump to address automatically
+        :param hexOut: output hex formatted ea instead
+        :return: ea of next ret
+        """
+        # state machine states for differnt return types that take more than one instruction
+        ST_NONE = 0
+        ST_PUSH = 1
+        ST_BX = 2
+        # current state is instruction-by-instruction. We haven't detected anything that could be part of return
+        state = ST_NONE
+        # count before state resets back due to the right combination not being found
+        instTimer = 0
+        instLimit = 50
+        # those need to be maintanied so that they're compared against an identical POP PC
+        pushRegs = []
+        # register number needs to match in POP, BX pattern
+        bxReg = -1
+        # don't count this item
+        ea = Data.Data(ea).ea + Data.Data(ea).getSize()
+        output = idaapi.BADADDR
+        while ea < self.end_ea:
+            currInst = InstDecoder.Inst(ea).fields
+            if currInst and currInst['magic'] == InstDecoder.INST_MOV_PC_LR:
+                output = ea
+                break
+            if state == ST_NONE:
+                if currInst and currInst['magic'] == InstDecoder.INST_PUSHPOP:
+                    regs = InstDecoder.getPushPopRegisters(currInst['Rlist'])
+                    # PUSH {PC. ...}
+                    if not currInst['pop'] and currInst['lr']:
+                        state = ST_PUSH
+                        pushRegs = regs
+                    # POP {R<X>}
+                    elif currInst['pop'] and not currInst['lr'] and len(regs) == 1:
+                        state = ST_BX
+                        bxReg = regs[0]
+
+            # look for a matching  POP {..., PC}
+            elif state == ST_PUSH:
+                if (currInst and currInst['magic'] == InstDecoder.INST_PUSHPOP and
+                    currInst['pop'] and currInst['lr']):
+                    regs = InstDecoder.getPushPopRegisters(currInst['Rlist'])
+                    if pushRegs == regs:
+                        output = ea
+                        break
+
+            # look for a matching BX R<X>
+            elif state == ST_BX:
+                if currInst and currInst['magic'] == InstDecoder.INST_BX and currInst['reg'] == bxReg:
+                    output = ea
+                    break
+
+            # advance time limit for pattern match, must be within instLimit instructions
+            if state == ST_PUSH or state == ST_BX:
+                # reset and go back to default state
+                if instTimer == instLimit:
+                    instTimer = 0
+                    state = ST_NONE
+                # advance timer
+                else:
+                    instTimer += 1
+            # advance to the next hypothetical thumb instruction
+            ea += 2
+        if ui: idaapi.jumpto(ea)
+        if hexOut: return '%07X' % output
+        return output
+
+    def unkret(self, ea, ui=True, hexOut=True):
+        """
+        Thhs finds the next return based on the next.ret function, that is not already defined within a function.
+        This counts red code, unknown bytes, and returns hidden within data.
+        :param ea: ea to start searching from
+        :param ui: if True, jump to address automatically
+        :param hexOut: output hex formatted ea instead
+        :return: ea of next unknown return
+        """
+        ea = self.ret(ea, ui=False, hexOut=False)
+        output = idaapi.BADADDR
+        while ea < self.end_ea:
+            d = Data.Data(ea)
+            if not Function.isFunction(d.ea):
+                output = ea
+                break
+            ea = self.ret(ea, ui=False, hexOut=False)
+        if ui: idc.jumpto(output)
+        if hexOut: return '%07X' % output
+        return output

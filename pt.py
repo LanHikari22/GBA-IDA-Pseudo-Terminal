@@ -1,43 +1,44 @@
-import time
 import idaapi
-idaapi.require("miscUtils")
-idaapi.require("disasmUtils")
-idaapi.require("fixUtils")
-idaapi.require("srchUtils")
+idaapi.require("miscTools")
+idaapi.require("disasmTools")
+idaapi.require("fixTools")
+idaapi.require("SrchTools.srchTools")
 idaapi.require("TerminalModule")
 idaapi.require("Definitions.Environment")
 from Definitions import Environment
-import miscUtils
-import disasmUtils
+import miscTools
+import disasmTools
 import TerminalModule
-import fixUtils
-import srchUtils
-
-
+import fixTools
+from SrchTools import srchTools
+import time
 
 class PseudoTerminal(TerminalModule.TerminalModule, object):
+    """
+    Contains all of the other terminal modules, as well as essential commands
+    """
     def __init__(self, fmt='[+] pt (main terminal)'):
         # the module itelf also has a summary format, this is created by TerminalModule
         super(PseudoTerminal, self).__init__(fmt)
 
         # each command in the module is added to the help and fmt records
-        self.registerCommand(self, self.help, "help", "<command/module>")
-        self.registerCommand(self, self.fmt, "fmt", "<command/module>")
-        self.registerCommand(self, self.echo, "echo", "<msg>")
-        self.registerCommand(self, self.time, "time", "<func> <func_args>")
-        self.registerCommand(self, self.clear, "clear", "")
-        self.registerCommand(self, self.env, "env",  "<key>=<val>,...")
-        self.registerCommand(self, self.clrenv, "clrenv", "")
+        self.registerCommand(self.help, "help (command/module)")
+        self.registerCommand(self.fmt, "fmt (command/module)")
+        self.registerCommand(self.echo, "echo (msg)")
+        self.registerCommand(self.time, "time (func, func_args)")
+        self.registerCommand(self.clear, "clear (n=32)")
+        self.registerCommand(self.env, "env (key=Val)")
+        self.registerCommand(self.clrenv, "clrenv ()")
 
         # __init__ of modules should set up things similarly to pt
-        self.dis = disasmUtils.dis()
-        self.registerHelp(self, self.help(self) + self.fmt(self.dis) + '\n')
-        self.misc = miscUtils.misc()
-        self.registerHelp(self, self.help(self) + self.fmt(self.misc) + '\n')
-        self.fix = fixUtils.fix()
-        self.registerHelp(self, self.help(self) + self.fmt(self.fix) + '\n')
-        self.srch = srchUtils.srch()
-        self.registerHelp(self, self.help(self) + self.fmt(self.srch) + '\n')
+        self.misc = miscTools.misc()
+        self.registerModule(self.misc)
+        self.dis = disasmTools.dis()
+        self.registerModule(self.dis)
+        self.fix = fixTools.fix()
+        self.registerModule(self.fix)
+        self.srch = srchTools.srch()
+        self.registerModule(self.srch)
 
 
 

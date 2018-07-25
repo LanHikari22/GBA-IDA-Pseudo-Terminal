@@ -24,3 +24,8 @@ env['incPath'] = ''
 # file.s    | Code is disassembled
 # file.bin  | The binary content is extracted
 env['gameFiles'] = None
+# TODO: Not supported yet
+# this includes the specific gameFiles to be updated. Set this to an empty dictionary, and all gameFiles are updated.
+# When working no specific files, set them here, and only those files and their dependencies are updated.
+# This can speed up disassembly operations
+# env['gameFilesUpdate'] = None

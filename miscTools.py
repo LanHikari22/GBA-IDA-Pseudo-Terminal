@@ -1,11 +1,8 @@
-# @file miscUtils
+# @file miscTools
 # whatever utilities go here! sometimes for testing, sometimes for convenience!
 
 import idaapi
 import idautils
-
-import srchUtils
-from srchUtils import srch
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
@@ -18,6 +15,9 @@ import TerminalModule
 
 
 class misc(TerminalModule.TerminalModule, object):
+    """
+    Different kinds of commands and tools go here. No label. Just take a look, OK?
+    """
     def __init__(self, fmt='[+] misc (tools of all kind)'):
         """
         This module is responsible for printing disassemblies and necessary compoents
@@ -25,14 +25,20 @@ class misc(TerminalModule.TerminalModule, object):
         """
         super(misc, self).__init__(fmt)
 
-        self.registerCommand(self, self.test, "test", "...")
-        self.registerCommand(self, self.fnrepl, "fnrepl", "<start_ea> <end_ea> <oldstr> <newstr>")
-        self.registerCommand(self, self.plcv, "plcv", "<ea>")
-        self.registerCommand(self, self.nlrepl, "nlrepl", "<oldStr> <newStr>")
-        self.registerCommand(self, self.rngmkd, "rngmkd", "<start_ea> <end_ea>")
+        self.registerCommand(self.gendocs, "gendocs (terminalModule)")
+        self.registerCommand(self.test, "test (_)")
+        self.registerCommand(self.fnrepl, "fnrepl (start_ea, end_ea, oldstr, newstr)")
+        self.registerCommand(self.plcv, "plcv (ea)")
+        self.registerCommand(self.nlrepl, "nlrepl (oldStr, newStr)")
+        self.registerCommand(self.rngmkd, "rngmkd (start_ea, end_ea)")
 
     @staticmethod
     def test(n):
+        """
+        This is just a scratchpad!
+        :param n:
+        :return:
+        """
         idc.get_color(here(), )
 
     @staticmethod
@@ -153,3 +159,40 @@ class misc(TerminalModule.TerminalModule, object):
             print ('%07X: -> word' % ea)
             idc.MakeDword(ea)
             ea += 4
+
+    def gendocs(self, mod):
+        """
+        Actually generates the docs for this file!
+        :return: the docs to go to the COMMANDS.md file
+        """
+        name = self.fmt(mod)[len('[+] '):self.fmt(mod).index(' (')]
+        desc = self.fmt(mod)[self.fmt(mod).index('('):]
+        md = ''
+        if name == 'pt':
+            md += "This file contains documentation for all of the modules and commands available " \
+             "through the pt (PseudoTerminal) object.\n"
+            md += "\n# Main Terminal\n"
+        else:
+            md += "\n# %s\n" % name
+        # display the description for the module
+        modHelp = mod.__doc__
+        if modHelp == None:
+            modHelp = ''
+        modHelp = modHelp.strip()
+        md += modHelp + '\n'
+        # document the modules and commands of this module
+        for m in mod.modules:
+            name = self.fmt(m)[len('[+] '):self.fmt(m).index(' (')]
+            desc = self.fmt(m)[self.fmt(m).index('('):]
+            md += "- **%s** %s\n" % (name, desc)
+        for c in mod.commands:
+            # only show the initial message, not teh parameter descriptions
+            help = self.help(c).strip()
+            if ':' in help:
+                help = help[:help.index(':')]
+            md += "- `%s` %s\n" % (self.fmt(c), help)
+        # do the same for every module
+        for m in mod.modules:
+            md += self.gendocs(m)
+        return md
+

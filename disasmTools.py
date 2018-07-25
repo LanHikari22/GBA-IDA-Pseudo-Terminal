@@ -1,4 +1,4 @@
-# @file disasmUtils
+# @file disasmTools
 # provides utility commands for disassembling
 import idaapi
 idaapi.require("IDAItems.Data")
@@ -6,23 +6,27 @@ idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
 import idc
 from IDAItems import Function, Data
-import TerminalModule, miscUtils
+import TerminalModule, miscTools
 
 
 class dis(TerminalModule.TerminalModule, object):
-    def __init__(self, fmt='[+] dis (disassembly utils)'):
+    """
+    This module contains utilities that help with disassembly exporting from IDA.
+    The disassembly is in a format compatible with the none-arm-eabi-gcc assembler.
+    """
+    def __init__(self, fmt='[+] dis (disassembly tools)'):
         """
         This module is responsible for printing disassemblies and necessary compoents
         of disassemblies
         """
         super(dis, self).__init__(fmt)
-        self.registerCommand(self, self.push, "push", "")
-        self.registerCommand(self, self.extract, "extract", "")
-        self.registerCommand(self, self.checkExtractedCode, "checkExtractedCode", "")
-        self.registerCommand(self, self.rng, "rng", "<start_ea> <end_ea>")
-        self.registerCommand(self, self.rngExterns, "rngExterns", "<start_ea> <end_ea>")
-        self.registerCommand(self, self.rngSyncedExterns, "rngSyncedExterns", "<start_ea> <end_ea>")
-        self.registerCommand(self, self.rngInc, "rngInc", "<start_ea> <end_ea>")
+        self.registerCommand(self.push, "push ()")
+        self.registerCommand(self.extract, "extract ()")
+        self.registerCommand(self.checkExtractedCode, "checkExtractedCode ()")
+        self.registerCommand(self.rng, "rng (start_ea, end_ea)")
+        self.registerCommand(self.rngExterns, "rngExterns (start_ea, end_ea)")
+        self.registerCommand(self.rngSyncedExterns, "rngSyncedExterns (start_ea, end_ea)")
+        self.registerCommand(self.rngInc, "rngInc (start_ea, end_ea)")
 
 
     def push(self):
@@ -287,7 +291,7 @@ class dis(TerminalModule.TerminalModule, object):
     @staticmethod
     def rngInc(start_ea, end_ea):
         """
-        Creates includes as well as forward references for the range
+        Reports back the exposed (or public) symbols of the range
         The symbols are .extern forwarded, and represent the symbols defined within the range
         :param start_ea: linear address of the start of the range
         :param end_ea: linear address of the end of the range, exclusive
@@ -315,7 +319,7 @@ class dis(TerminalModule.TerminalModule, object):
                 ea = ea + d.getSize()
 
         # string build includes
-        inc = '/* Public Interface */\n'
+        inc = '/* Public Symbols */\n'
         for name, ea in pubrefs:
             inc += ".extern %s\n" % (name)
         # inc += "\n// Forward Reference\n"

@@ -1,15 +1,13 @@
-# @file fixUtils
+# @file fixTools
 # utilities for automatic fixing go here!
 import idaapi
 import idautils
 
-import srchUtils
+from SrchTools import srchTools
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
-
-from Definitions import Architecture, Paths
 
 import idc
 from IDAItems import Function, Data
@@ -17,19 +15,23 @@ import TerminalModule
 
 
 class fix(TerminalModule.TerminalModule, object):
-    def __init__(self, fmt='[+] fix (emergency room utils for your IDB)'):
+    """
+    This module contains tools to run on the database to fix problems all throughout the database
+    or over a range
+    """
+    def __init__(self, fmt='[+] fix (emergency room tools for your IDB)'):
         """
         This module is responsible for printing disassemblies and necessary compoents
         of disassemblies
         """
         super(fix, self).__init__(fmt)
 
-        self.registerCommand(self, self.remFuncChunks, "remFuncChunks", "")
-        self.registerCommand(self, self.replNameParen, "replNameParen", "")
-        self.registerCommand(self, self.markRedundantInsts, "markRedundantInsts", "<start_ea> <end_ea>")
-        self.registerCommand(self, self.makeThumb, "makeThumb", "<start_ea> <end_ea>")
-        self.registerCommand(self, self.changeASCII, "changeASCII", "")
-        self.registerCommand(self, self.removeStackVarUsages, "removeStackVarUsages", "<start_ea> <end_ea>")
+        self.registerCommand(self.remFuncChunks, "remFuncChunks ()")
+        self.registerCommand(self.replNameParen, "replNameParen ()")
+        self.registerCommand(self.markRedundantInsts, "markRedundantInsts (start_ea, end_ea)")
+        self.registerCommand(self.makeThumb, "makeThumb (start_ea, end_ea)")
+        self.registerCommand(self.changeASCII, "changeASCII ()")
+        self.registerCommand(self.removeStackVarUsages, "removeStackVarUsages (start_ea, end_ea)")
 
     @staticmethod
     def remFuncChunks():
@@ -98,7 +100,7 @@ class fix(TerminalModule.TerminalModule, object):
                 redundant = True
                 # MOVS R3, R3
                 content = d.getContent()
-                if d.getContent() in srchUtils.srch._getFakeInstructions():
+                if d.getContent() in srchTools.srch._getFakeInstructions():
                     print("%07X: <mkdata>" % (ea))
                 else:
                     redundant = False
@@ -120,7 +122,7 @@ class fix(TerminalModule.TerminalModule, object):
         :param ea: the address to start from
         :return: False if no instruction found, else True
         """
-        srch = srchUtils.srch()
+        srch = srchTools.srch()
         ea = int(srch.nextarm(start_ea, ui=False), 16)
         foundARM = False
         while ea <= end_ea:
@@ -180,3 +182,13 @@ class fix(TerminalModule.TerminalModule, object):
         else:
             print("No stack variable usages to remove!")
 
+
+    @staticmethod
+    def fixFunctionRanges(start_ea, end_ea):
+        """
+
+        :param start_ea:
+        :param end_ea:
+        :return:
+        """
+        raise(NotImplemented())

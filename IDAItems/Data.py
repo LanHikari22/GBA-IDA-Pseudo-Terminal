@@ -8,7 +8,7 @@ import idc
 import re
 
 import IDAItems
-import miscUtils
+import miscTools
 
 
 class DataException(Exception):
@@ -597,6 +597,9 @@ class Data:
                 raise (DataException('%07X: found = in a weird place in PC-relative load' % self.ea))
             # grab the value in the =. That content must be consistent with pool_ea's content
             poolName = words[2][1:]
+            # if there's a comment, don't include it
+            if ';' in poolName:
+                poolName = poolName[:poolName.index(';')]
             # filter out potential ()s
             if poolName[0] == '(':
                 poolName = poolName[1:-1]
@@ -615,7 +618,7 @@ class Data:
                         break
         # we're using the LDR RX, name format.
         else:
-            # TODO: [BUG] this format now breaks!
+            # TODO: [BUG] this format now breaks! (Not enabled by default from IDA settings)
             # the correct xref is the one with the identical name in the instruction
             for xref in xrefsFrom[1]:
                 d = Data(xref)
@@ -655,7 +658,7 @@ class Data:
             else:
                 index = ''
 
-            cmt = "%s%s" % (content.getName(), index)
+            cmt = "=%s%s" % (content.getName(), index)
         else:
             cmt = "=0x%X" % content.ea
 

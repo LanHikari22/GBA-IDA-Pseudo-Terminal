@@ -13,23 +13,37 @@ class TerminalModule:
     def __init__(self, fmt):
         self.registerFmt(self, fmt)
         self.registerHelp(self, fmt + '\n')
+        self.commands = []
+        self.modules = []
 
     def __str__(self):
         return self.help(self)
 
-    @staticmethod
-    def registerCommand(module, cmdf, name, fmt):
+    def registerModule(self, module):
+        """
+        Adds the module to the list of moudles and registers its help
+        :param module: module to register within this module
+        :return:
+        """
+        self.registerHelp(self, self.help(self) + self.fmt(module) + '\n')
+        self.modules.append(module)
+
+    def registerCommand(self, cmdf, fmt):
         """
         Registers the command within the specified module, registers help and fmt entries for them,
         and updates the help entry for the module
         :param module: the TerminalModule
         :param cmdf: the command function within the module
-        :param name: the name of the command
         :param fmt: the one-line summary of how to use the command
         """
-        TerminalModule.registerHelp(cmdf, cmdf.__doc__)
-        TerminalModule.registerFmt(cmdf, fmt)
-        TerminalModule.registerHelp(module, module.help(module) + name + ' ' + fmt + '\n')
+        help = cmdf.__doc__
+        if help == None:
+            help = ''
+        self.registerHelp(cmdf, help)
+        self.registerFmt(cmdf, fmt)
+        self.registerHelp(self, self.help(self) + fmt + '\n')
+        self.commands.append(cmdf)
+
 
     @staticmethod
     def registerHelp(key, help):
