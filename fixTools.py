@@ -3,14 +3,14 @@
 import idaapi
 import idautils
 
-from SrchTools import srchTools
+from SrchTools import srchTools, nextTools
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
 
 import idc
-from IDAItems import Function, Data
+from IDAItems import Function, Data, InstDecoder
 import TerminalModule
 
 
@@ -32,6 +32,8 @@ class fix(TerminalModule.TerminalModule, object):
         self.registerCommand(self.makeThumb, "makeThumb (start_ea, end_ea)")
         self.registerCommand(self.changeASCII, "changeASCII ()")
         self.registerCommand(self.removeStackVarUsages, "removeStackVarUsages (start_ea, end_ea)")
+        self.registerCommand(self.makeUnkPushFuncs, "makeUnkPushFuncs (start_ea, end_ea)")
+        self.registerCommand(self.fixFunctionRanges, "fixFunctionRanges (start_ea, end_ea)")
 
     @staticmethod
     def remFuncChunks():
@@ -122,15 +124,15 @@ class fix(TerminalModule.TerminalModule, object):
         :param ea: the address to start from
         :return: False if no instruction found, else True
         """
-        srch = srchTools.srch()
-        ea = int(srch.nextarm(start_ea, ui=False), 16)
+        srchNext = srchTools.nextTools.next()
+        ea = int(srchNext.arm(start_ea, ui=False), 16)
         foundARM = False
         while ea <= end_ea:
             foundARM = True
             # fix arm to thumb
             print("%07X: Changing to THUMB mode" % ea)
             idc.SetRegEx(ea, "T", 1, idc.SR_user)
-            ea = int(srch.nextarm(ea, ui=False), 16)
+            ea = int(srchNext.arm(ea, ui=False), 16)
         if foundARM:
             print("Successfully changed ARM modes to THUMB!")
             return True
@@ -139,19 +141,20 @@ class fix(TerminalModule.TerminalModule, object):
             return False
 
     @staticmethod
-    def changeASCII(start_ea, ):
+    def changeASCII(start_ea, end_ea):
         """
         finds all ascii named data and changes it to bytes and removes its name
         """
         found = False
-        for ea, name in idautils.Names():
+        ea = start_ea
+        while ea < end_ea:
             d = Data.Data(ea)
             if idc.isASCII(d._getFlags()):
                 found = True
                 print("%07X: Make ASCII -> Byte" % ea)
                 idc.MakeByte(ea)
-                idc.MakeName(ea, '')
-
+                idc.MakeName(ea, 'ASCII_%07X' % ea)
+            ea += d.getSize()
 
         if found:
             print("changed all ASCII data to byte data!")
@@ -182,13 +185,62 @@ class fix(TerminalModule.TerminalModule, object):
         else:
             print("No stack variable usages to remove!")
 
+    @staticmethod
+    def makeUnkPushFuncs(start_ea, end_ea):
+        """
+        Finds and fixes all dead functions not declared as functions following the pattern PUSH {..., LR} POP {..., PC}
+        This also only makes functions until the first occurrance of a POP {..., PC}. However, this results in a
+        function range error, and that can be fixed as well.
+        :param start_ea: start of the range to fix
+        :param end_ea: end of the range to fix
+        :return:
+        """
+        next = nextTools.next()
+        ea, pop_ea = next.deadfunc(start_ea, ui=False, hexOut=False)
+        while ea < end_ea:
+            d = Data.Data(ea)
+            if d.isCode():
+                print('Adding unknown push func @ %07X' % ea)
+                idc.add_func(ea, pop_ea+2)
+            ea, pop_ea = next.deadfunc(pop_ea, ui=False, hexOut=False)
+
 
     @staticmethod
     def fixFunctionRanges(start_ea, end_ea):
         """
-
-        :param start_ea:
-        :param end_ea:
+        Fixes all functions with improper returns, by finding their returns and changing their ranges
+        For each function, it will ensure that it ends properly until the start of another function, or a data element
+        with data xrefs to it. If it ends improperly, or there exists a matching return that is
+        not part of the function, it's made part of the function
+        This may not behave correctly around dead functions or null_subs. Run tools to Detect and fix those first.
+        :param start_ea: start of the range to fix functions in
+        :param end_ea: end of the range to fix functions in
         :return:
         """
-        raise(NotImplemented())
+        # only look 50 instructions ahead, for range change
+        searchLimit = 50
+        for func_ea in idautils.Functions(start_ea, end_ea):
+            f = Function.Function(func_ea)
+            # absolute end address of the function (if another function is detected or a data item with data xrefs is)
+            stop_ea = f.func_ea + f.getSize()
+            for i in range(stop_ea, stop_ea+searchLimit):
+                if Function.isFunction(i) or Data.Data(i).getXRefsTo()[1]:
+                    stop_ea = i
+                    break
+            next_tools = nextTools.next()
+            # figure out the first return, and return type of this function. That should be consistent
+            ret_ea = next_tools.ret(f.func_ea, ui=False, hexOut=False)
+            retType = InstDecoder.Inst(ret_ea).fields['magic']
+            # modify the function range to include all returns
+            if Function.isFunction(ret_ea):
+                ret_ea = next_tools.unkret(f.func_ea, ui=False, hexOut=False)
+                # this ret_ea is not within the function, if the return type is different
+                if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
+                    continue
+            while f.func_ea < ret_ea < stop_ea:
+                # detected that the function range is invalid, fix range
+                print('ret %07X' % ret_ea)
+                ret_ea = next_tools.unkret(ret_ea, ui=False, hexOut=False)
+                # this ret_ea is not within the function, if the return type is different
+                if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
+                    break
