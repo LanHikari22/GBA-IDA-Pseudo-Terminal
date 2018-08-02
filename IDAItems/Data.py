@@ -305,8 +305,10 @@ class Data:
         disasm += "\t" + self.getDisasm()
         # include comment
         comment = self.getComment()
+        # comments are one-line, tabbed, and
         if comment:
-            disasm += "  // " + comment
+            comment = "// " + comment.replace('\n', '\n// ') + '\n'
+            disasm = comment + disasm
 
         disasm = self._convertTabs(disasm)
         return disasm
@@ -616,6 +618,11 @@ class Data:
                     if idc.Name(xref) and idc.Name(xref) != poolName:
                         pool_ea = xref
                         break
+                if pool_ea == -1:
+                    # check if the pool is pointing to an index of itself (array)
+                    if Data(xrefsFrom[1][0]).ea == Data(xrefsFrom[1][1]).ea:
+                        # the smaller one would be the pool location, as in the start of the array. (unless identical)
+                        pool_ea = min(xrefsFrom[1][0], xrefsFrom[1][1])
         # we're using the LDR RX, name format.
         else:
             # TODO: [BUG] this format now breaks! (Not enabled by default from IDA settings)
@@ -832,6 +839,7 @@ class Data:
         :param disasm: the source disassembly, it's returned if there's nothing to change
         :return: the source disasm or the new one if there are changes to be made
         """
+        # TODO[BUG] (slight): doesn't account for cases like  'STRB R7, [R6,#byte_5]' because the pointe is not taken as valid.
         if '#(' in disasm:
             xrefs = self.getXRefsFrom()
             # if any references are present at this line

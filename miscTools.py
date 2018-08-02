@@ -4,6 +4,8 @@
 import idaapi
 import idautils
 
+from Definitions.Environment import env
+
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
@@ -27,6 +29,7 @@ class misc(TerminalModule.TerminalModule, object):
 
         self.registerCommand(self.gendocs, "gendocs (terminalModule)")
         self.registerCommand(self.test, "test (_)")
+        self.registerCommand(self.ea2gamefile, "ea2gamefile (ea)")
         self.registerCommand(self.fnrepl, "fnrepl (start_ea, end_ea, oldstr, newstr)")
         self.registerCommand(self.plcv, "plcv (ea)")
         self.registerCommand(self.nlrepl, "nlrepl (oldStr, newStr)")
@@ -40,6 +43,26 @@ class misc(TerminalModule.TerminalModule, object):
         :return:
         """
         idc.get_color(here(), )
+
+    @staticmethod
+    def ea2gamefile(ea):
+        # type: (int) -> str
+        """
+        Return the game file the ea belongs to
+        :param ea: the linear address to find the file it belongs to
+        :return: the game file name
+        """
+        gameFiles = env.get('gameFiles')
+        output = None
+        if not gameFiles:
+            print('ERROR: environmental variable for gameFiles required')
+            return None
+        for file in gameFiles:
+            if gameFiles[file][0] <= ea < gameFiles[file][1]:
+                output = file
+                break
+        return output
+
 
     @staticmethod
     def fnrepl(start_ea, end_ea, oldstr, newstr, log=True):

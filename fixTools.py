@@ -30,10 +30,13 @@ class fix(TerminalModule.TerminalModule, object):
         self.registerCommand(self.replNameParen, "replNameParen ()")
         self.registerCommand(self.markRedundantInsts, "markRedundantInsts (start_ea, end_ea)")
         self.registerCommand(self.makeThumb, "makeThumb (start_ea, end_ea)")
-        self.registerCommand(self.changeASCII, "changeASCII ()")
+        self.registerCommand(self.changeASCII, "changeASCII (start_ea, end_ea)")
+        self.registerCommand(self.removeText, "removeText (start_ea, end_ea)")
         self.registerCommand(self.removeStackVarUsages, "removeStackVarUsages (start_ea, end_ea)")
         self.registerCommand(self.makeUnkPushFuncs, "makeUnkPushFuncs (start_ea, end_ea)")
         self.registerCommand(self.fixFunctionRanges, "fixFunctionRanges (start_ea, end_ea)")
+        self.registerCommand(self.removeFakeRedCode, "removeFakeRedCode (start_ea, end_ea)")
+        self.registerCommand(self.removeRedCode, "removeRedCode (start_ea, end_ea)")
 
     @staticmethod
     def remFuncChunks():
@@ -102,7 +105,7 @@ class fix(TerminalModule.TerminalModule, object):
                 redundant = True
                 # MOVS R3, R3
                 content = d.getContent()
-                if d.getContent() in srchTools.srch._getFakeInstructions():
+                if d.getContent() in srchTools.nextTools.next._getFakeInstructions():
                     print("%07X: <mkdata>" % (ea))
                 else:
                     redundant = False
@@ -162,6 +165,27 @@ class fix(TerminalModule.TerminalModule, object):
             print("no ASCII data was found!")
 
     @staticmethod
+    def removeText(start_ea, end_ea):
+        """
+        removes all ASCII text that is in text "..." format
+        :param start_ea: start of the range to remove
+        :param end_ea: end of the range to remove
+        """
+        found = False
+        ea = start_ea
+        while ea < end_ea:
+            d = Data.Data(ea)
+            if idc.isASCII(d._getFlags()) and 'text ' in d.getOrigDisasm():
+                found = True
+                print("%07X: Make text -> Byte" % ea)
+                idc.MakeByte(ea)
+            ea += d.getSize()
+        if found:
+            print("changed all ASCII data to byte data!")
+        else:
+            print("no ASCII data was found!")
+
+    @staticmethod
     def removeStackVarUsages(self_ea, end_ea):
         madeChanges = False
         for func_ea in idautils.Functions(self_ea, end_ea):
@@ -196,13 +220,13 @@ class fix(TerminalModule.TerminalModule, object):
         :return:
         """
         next = nextTools.next()
-        ea, pop_ea = next.deadfunc(start_ea, ui=False, hexOut=False)
+        ea, pop_ea = next.deadfunc(start_ea, end_ea, ui=False, hexOut=False)
         while ea < end_ea:
             d = Data.Data(ea)
             if d.isCode():
                 print('Adding unknown push func @ %07X' % ea)
                 idc.add_func(ea, pop_ea+2)
-            ea, pop_ea = next.deadfunc(pop_ea, ui=False, hexOut=False)
+            ea, pop_ea = next.deadfunc(pop_ea, end_ea, ui=False, hexOut=False)
 
 
     @staticmethod
@@ -244,3 +268,40 @@ class fix(TerminalModule.TerminalModule, object):
                 # this ret_ea is not within the function, if the return type is different
                 if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
                     break
+
+    @staticmethod
+    def removeFakeRedCode(start_ea, end_ea):
+        """
+        Removes instances of code recognized by IDA to be code, but are unlikely not to be by making them bytes.
+        :param start_ea: start of the range to fix
+        :param end_ea: end of the range to fix
+        :return:
+        """
+        srchNext = srchTools.nextTools.next()
+        redStart_ea, redEnd_ea = srchNext.fakered(start_ea, end_ea, ui=False,hexOut=False)
+        while redStart_ea < end_ea:
+            # change to bytes
+            print("%07X: del fake red code (%07X, %07X)" % (redStart_ea, redStart_ea, redEnd_ea))
+            idc.del_items(redStart_ea,0,redEnd_ea-redStart_ea)
+            redStart_ea, redEnd_ea = srchNext.fakered(redEnd_ea, end_ea, ui=False, hexOut=False)
+
+
+    @staticmethod
+    def removeRedCode(start_ea, end_ea):
+        """
+        unconditionally removes all red code within a specified region
+        :param start_ea: start of the region
+        :param end_ea: end of the region
+        :return:
+        """
+        srchNext = srchTools.nextTools.next()
+        redStart_ea = redEnd_ea = srchNext.red(start_ea, end_ea, ui=False,hexOut=False)
+        while redEnd_ea < end_ea:
+            d = Data.Data(redEnd_ea)
+            while d.isCode() and not Function.isFunction(d.ea):
+                redEnd_ea += 2
+                d = Data.Data(redEnd_ea)
+            # change to bytes
+            print("%07X: del red code (%07X, %07X)" % (redStart_ea, redStart_ea, redEnd_ea))
+            idc.del_items(redStart_ea,0,redEnd_ea-redStart_ea)
+            redStart_ea = redEnd_ea = srchNext.red(redEnd_ea, end_ea, ui=False, hexOut=False)

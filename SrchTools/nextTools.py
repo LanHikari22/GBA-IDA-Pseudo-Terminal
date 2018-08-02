@@ -30,7 +30,7 @@ class next(TerminalModule.TerminalModule, object):
         self.registerCommand(self.arm, "arm (search_ea, ui=True)")
         self.registerCommand(self.ascii, "ascii (search_ea, ui=True)")
         self.registerCommand(self.fakeinst, "fakeinst (search_ea, ui=True)")
-        self.registerCommand(self.name, "name (search_ea, ui=True)")
+        self.registerCommand(self.name, "name (search_ea, ui=True, hexOut=True)")
         self.registerCommand(self.known, "known (search_ea, ui=True)")
         self.registerCommand(self.bin, "bin (search_ea, ui=True)")
         self.registerCommand(self.red, "red (search_ea, ui=True)")
@@ -120,17 +120,19 @@ class next(TerminalModule.TerminalModule, object):
         a list of detected instructions with different encoding using arm-none-eabi gcc
         :return: list of opcodes
         """
-        # TODO: super clumsy, replace this with logical detection
-        return [0x0, 0x1, 0x3, 0x4, 0x09, 0xA, 0x19, 0x1B, 0x1C00, 0x1C12, 0x1C1B, 0x1F9B, 0x4425,
+        # TODO: super clumsy, replace this with logical detection. (I don't want to because, incidentally this is a
+        # TODO: good way of detecting false code)
+        return [0x0, 0x1, 0x2, 0x3, 0x4, 0x09, 0xA, 0x19, 0x1B, 0x22, 0x1C00, 0x1C09, 0x1C12, 0x1C1B, 0x1F9B, 0x4425,
                 0xB85D, 0xB88B, 0xB8A3]
 
 
-    def name(self, ea, ui=True):
+    def name(self, ea, ui=True, hexOut=True):
         """
         Finds the next ea with which a name exists
         :param ea: ea to start searching from
         :param ui: if True, jump to address automatically
-        :return: hex formatted ea of next name
+        :param hexOut: output hex formatted ea if True
+        :return: ea of next name
         """
         # don't count this item
         ea = Data.Data(ea).ea + Data.Data(ea).getSize()
@@ -142,7 +144,9 @@ class next(TerminalModule.TerminalModule, object):
                 break
             ea += d.getSize()
         if ui: idaapi.jumpto(ea)
-        return '%07X' % output
+        if hexOut:
+            return '%07X' % output
+        return output
 
     def known(self, ea, ui=True):
         """
@@ -215,10 +219,11 @@ class next(TerminalModule.TerminalModule, object):
         idaapi.jumpto(start_ea)
         return '0x%07X, 0x%07X, 0x%X' % (start_ea, end_ea, size)
 
-    def red(self, ea, ui=True, hexOut=True):
+    def red(self, ea, end_ea=None, ui=True, hexOut=True):
         """
         Looks for code items outside function items. The first detected is returned
         :param ea: ea to start searching from
+        :param end_ea: the last address of the search range, or default if None
         :param ui: if True, jump to address automatically
         :param hexOut: output hex formatted ea range instead
         :return: ea of next name
@@ -226,7 +231,8 @@ class next(TerminalModule.TerminalModule, object):
         # don't count this item
         ea = Data.Data(ea).ea + Data.Data(ea).getSize()
         output = idaapi.BADADDR
-        while ea < self.end_ea:
+        if not end_ea: end_ea = self.end_ea
+        while ea < end_ea:
             d = Data.Data(ea)
             if d.isCode() and not Function.isFunction(d.ea):
                 output = ea
@@ -270,7 +276,7 @@ class next(TerminalModule.TerminalModule, object):
     def ret(self, ea, end_ea=None, ui=True, hexOut=True):
         """
         Looks for the next data item that encodes a function return
-        ~ BX LR ~ TODO: implement this
+        - BX LR
         - MOV PC, LR
         - PUSH {..., LR} [Up to instLimit gap insts] POP {..., LR} (regLists must be matching)
         - POP {R<X>} [Up to instLimit gap insts] BX R<X>
@@ -300,7 +306,8 @@ class next(TerminalModule.TerminalModule, object):
         if not end_ea: end_ea = self.end_ea
         while ea < end_ea:
             currInst = InstDecoder.Inst(ea).fields
-            if currInst and currInst['magic'] == InstDecoder.INST_MOV_PC_LR:
+            if currInst and (currInst['magic'] == InstDecoder.INST_MOV_PC_LR or
+                             currInst['magic'] == InstDecoder.INST_BX and currInst['reg'] == 14):
                 output = ea
                 break
             if state == ST_NONE:
@@ -355,7 +362,7 @@ class next(TerminalModule.TerminalModule, object):
         :param hexOut: output hex formatted ea instead
         :return: ea of next unknown return
         """
-        ea = self.ret(ea, ui=False, hexOut=False)
+        ea = self.ret(ea, end_ea, ui=False, hexOut=False)
         output = idaapi.BADADDR
         if not end_ea: end_ea = self.end_ea
         while ea < end_ea:
@@ -363,16 +370,17 @@ class next(TerminalModule.TerminalModule, object):
             if not Function.isFunction(d.ea):
                 output = ea
                 break
-            ea = self.ret(ea, ui=False, hexOut=False)
+            ea = self.ret(ea, end_ea, ui=False, hexOut=False)
         if ui: idc.jumpto(output)
         if hexOut: return '%07X' % output
         return output
 
-    def deadfunc(self, ea, ui=True, hexOut=True):
+    def deadfunc(self, ea, end_ea=None, ui=True, hexOut=True):
         """
         This finds the next occurrance of a dead function not recognized as a function (ie, red code or data)
         This can only find functions ranges it can guarantee, ie, only PUSH {..., LR} POP {..., PC} patterns.
         :param ea: ea to start searching from
+        :param end_ea: the last address of the search range
         :param ui: if True, jump to address automatically
         :param hexOut: output hex formatted ea range instead
         :return: range of ea of next dead function
@@ -383,7 +391,8 @@ class next(TerminalModule.TerminalModule, object):
         push_ea = idaapi.BADADDR
         pop_ea = idaapi.BADADDR
         push_regs = None
-        while ea < self.end_ea:
+        if not end_ea: end_ea = self.end_ea
+        while ea < end_ea:
             # the current item must not belong to a function, or have any data xrefs
             if not Function.isFunction(ea) and not Data.Data(ea).getXRefsTo()[1]:
                 inst = InstDecoder.Inst(ea).fields
@@ -405,50 +414,50 @@ class next(TerminalModule.TerminalModule, object):
         if hexOut: return '(%07X, %07X)' % (push_ea, pop_ea)
         return (push_ea, pop_ea)
 
-    def fakered(self, ea, ui=True, hexOut=True):
+    def fakered(self, ea, end_ea=None, ui=True, hexOut=True):
         """
         This finds the next occurrance of a not a red code segment that has no return pattern to it, making it unlikely
         to belong to a function.
         :param ea: ea to start searching from
         :param ui: if True, jump to address automatically
+        :param end_ea: the last address of the search range. If not specified, default is used.
         :param hexOut: output hex formatted ea range instead
         :return: range of ea of next fake red code segment
         """
-        ea = self.red(ea, ui=False, hexOut=False)
+        # TODO: change implementation to be based on return patterns?
+        ea = self.red(ea, end_ea, ui=False, hexOut=False)
         start_ea = ea
-        end_ea = idaapi.BADADDR
+        end_red_ea = idaapi.BADADDR
         # flag for when the whole red segment is finished and we can go to the next red code segment
         finishedSegment = False
         # condition for if the segment has already been invalidated before reaching its end
         isFake = True
-        while ea < self.end_ea:
+
+        if not end_ea: end_ea = self.end_ea
+        while ea < end_ea:
             d = Data.Data(ea)
             inst = InstDecoder.Inst(ea).fields
-            # simple return pattern, immediately abandon checking if this red code segment is fake
-            if inst and inst['magic'] == InstDecoder.INST_MOV_PC_LR:
-                isFake = False
+
             # traverse red code, and find the end of the red segment
             if Function.isFunction(ea) and d.isCode() or not d.isCode():
-                # heuristic that if a return pattern like POP is detected, its initial part (PUSH) won't exceed
-                # instLimit instructions
-                instLimit = 150
                 # update region end to this red code region
-                end_ea = ea
+                end_red_ea = ea
                 # confirm if the return is within range, then this isn't fake code. Find the next red!
-                if not isFake or start_ea <= self.unkret(start_ea-instLimit, end_ea, ui=False, hexOut=False) < end_ea:
-                    finishedSegment = True
-                # fake code! there are no returns within it, so it's either incomplete or fake.
-                else:
+                if isFake : # or start_ea <= self.unkret(start_ea-instLimit, end_ea, ui=False, hexOut=False) < end_ea:
                     break
-                # next red segment is fake unless proven not fake
+                # search the next red region
                 isFake = True
-            # move on to next red code segment
-            if finishedSegment:
-                finishedSegment = False
-                start_ea = ea = self.red(end_ea, ui=False, hexOut=False)
+                start_ea = ea = self.red(end_red_ea, end_ea, ui=False, hexOut=False)
+
             # advance through the red code
             else:
-              ea += d.getSize()
-        if ui: idc.jumpto(end_ea-2)
-        if hexOut: return '(%07X, %07X)' % (start_ea, end_ea)
-        return (start_ea, end_ea)
+                # simple function pattern,s, if it sorta looks like it can be a function, don't count it as fake.
+                # this includes return patterns, and push/pop.
+                if inst and (inst['magic'] == InstDecoder.INST_MOV_PC_LR or
+                                         inst['magic'] == InstDecoder.INST_BX and inst['reg'] == 14 or
+                                         inst['magic'] == InstDecoder.INST_PUSHPOP and inst['lr']):
+                    isFake = False
+                ea += d.getSize()
+        if ui: idc.jumpto(end_red_ea - 2)
+        if hexOut: return '(%07X, %07X)' % (start_ea, end_red_ea)
+        return (start_ea, end_red_ea)

@@ -274,7 +274,9 @@ class dis(TerminalModule.TerminalModule, object):
         for include in includes.keys():
             output += '.include "%s.inc"\n' % (include[:include.index('.')])
             for xref in includes[include]:
+                # Only extern if all symbols are defined somewhere. While actively disassembling, .equ is helpful
                 output += '// .extern %s\n' % (Data.Data(xref).getName())
+                # output += '.equ %s, 0x%07X\n' % (Data.Data(xref).getName(), Data.Data(xref).ea)
             output += '\n'
 
         # output remaining xrefs
@@ -314,6 +316,7 @@ class dis(TerminalModule.TerminalModule, object):
                             isPublic = True
                     if isPublic:
                         pubrefs.append((d.getName(), d.ea))
+                     # For debugging purposes
                     # else:
                     #     fwdrefs.append((d.getName(), d.ea))
                 ea = ea + d.getSize()
@@ -322,8 +325,9 @@ class dis(TerminalModule.TerminalModule, object):
         inc = '/* Public Symbols */\n'
         for name, ea in pubrefs:
             inc += ".extern %s\n" % (name)
+        # For debugging purposes, defining forward references could be useful in include files
         # inc += "\n// Forward Reference\n"
         # for name, ea in fwdrefs:
-        #     inc += ".extern %s\n" % (name)
+        #     inc += ".equ %s, 0x%07X\n" % (name, ea)
         inc += "\n"
         return inc
