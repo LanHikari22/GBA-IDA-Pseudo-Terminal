@@ -182,22 +182,23 @@ class Function:
         #     drefs.append(ref)
         return crefs, drefs
 
-    def getComment(self):
+    def getComment(self, repeatable=False):
         # type: () -> str
         """
-        Sometimes the comment is repeatable (created through decomp) or not (created through disass).
-        Returning disass comment
+        returns the comment associated with the function. This could be its repeatable comment to show in all
+        disassembly, or just its docs
         """
-        cmt = idc.get_func_cmt(self.func_ea, 1)
-        if not cmt: cmt = idc.get_func_cmt(self.func_ea, 0)
+        mode = 1 if repeatable else 0
+        cmt = idc.get_func_cmt(self.func_ea, mode)
         return cmt
 
-    def setComment(self, cmt):
+    def setComment(self, cmt, repeatable=False):
         # type: (str) -> ()
         """
         :param cmt: Comment to be set as a function comment
         """
-        idaapi.set_func_cmt(self.func, cmt, 1)
+        mode = 1 if repeatable else 0
+        idaapi.set_func_cmt(self.func, cmt, mode)
 
     def getSize(self, withPool=False):
         """
@@ -278,19 +279,20 @@ class Function:
         """
         ea = self.func_ea
 
+        # specify start of function
+        disasm = '.func\n'
+
         # specify  whether this is an arm or thumb function
         if self.isThumb():
-            disasm = ".thumb\n"
-        else:
-            disasm = ".arm\n"
+            disasm += ".thumb_func\n"
 
         # spefiy function comment, if available
         # put // for function comment in each line
+        comment = ''
+        if self.getComment(repeatable=True):
+            comment += '// ' + self.getComment(repeatable=True).replace('\n', '\n// ') + '\n'
         if self.getComment():
-            comment = '// ' + self.getComment().replace('\n', '\n// ',
-                                                self.getComment().count("\n")) + '\n'
-        else:
-            comment = ''
+            comment += '// ' + self.getComment().replace('\n', '\n// ') + '\n'
         disasm += comment
 
         # if available, provide .equs for all stack variables
@@ -303,7 +305,8 @@ class Function:
             disasm += d.getFormattedDisasm() + "\n"
             # advance to next item
             ea = ea + d.getSize()
-        disasm += "// end of function %s" % self.getName()
+        disasm += ".endfunc // %s" % self.getName()
+
         return disasm
 
 

@@ -274,8 +274,14 @@ class dis(TerminalModule.TerminalModule, object):
         for include in includes.keys():
             output += '.include "%s.inc"\n' % (include[:include.index('.')])
             for xref in includes[include]:
-                # Only extern if all symbols are defined somewhere. While actively disassembling, .equ is helpful
-                output += '// .extern %s\n' % (Data.Data(xref).getName())
+                # Only global if all symbols are defined somewhere. While actively disassembling, .equ is helpful
+                d = Data.Data(xref)
+                if d.isFunctionStart():
+                    cmt = idc.get_func_cmt(xref, repeatable=1)
+                    if cmt: cmt = ' // ' + cmt.replace('\n', '\n// ')
+                else:
+                    cmt = ''
+                output += '// .global %s%s\n' % (d.getName(), cmt)
                 # output += '.equ %s, 0x%07X\n' % (Data.Data(xref).getName(), Data.Data(xref).ea)
             output += '\n'
 
@@ -294,7 +300,7 @@ class dis(TerminalModule.TerminalModule, object):
     def rngInc(start_ea, end_ea):
         """
         Reports back the exposed (or public) symbols of the range
-        The symbols are .extern forwarded, and represent the symbols defined within the range
+        The symbols are .global forwarded, and represent the symbols defined within the range
         :param start_ea: linear address of the start of the range
         :param end_ea: linear address of the end of the range, exclusive
         :return: a series of .equ's representing the public (and private) interface of the range
@@ -324,7 +330,13 @@ class dis(TerminalModule.TerminalModule, object):
         # string build includes
         inc = '/* Public Symbols */\n'
         for name, ea in pubrefs:
-            inc += ".extern %s\n" % (name)
+            d = Data.Data(ea)
+            if d.isFunctionStart():
+                cmt = idc.get_func_cmt(ea, repeatable=1)
+                if cmt: cmt = ' // ' + cmt.replace('\n', '\n// ')
+            else:
+                cmt = ''
+            inc += '.global %s%s\n' % (name, cmt)
         # For debugging purposes, defining forward references could be useful in include files
         # inc += "\n// Forward Reference\n"
         # for name, ea in fwdrefs:

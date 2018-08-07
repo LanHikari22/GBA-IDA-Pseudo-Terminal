@@ -66,11 +66,12 @@ class Data:
         """
         return idc.get_item_size(self.ea)
 
-    def getComment(self):
+    def getComment(self, repeatable=False):
         """
-        :return: non-repeatable comment, prioritizes GUI-added comments over API added ones
+        :return: data item comment, prioritizes GUI-added comments over API added ones
         """
-        return idc.get_cmt(self.ea, 0) or ''
+        mode = 1 if repeatable else 0
+        return idc.get_cmt(self.ea, mode) or ''
 
     def setComment(self, comment):
         # type: (str) -> None
@@ -301,14 +302,22 @@ class Data:
             if self.isCode():
                 disasm += "\n"
 
+        # include comment
+        comment = ''
+        # include the data item's comment
+        comment = self.getComment()
+        if self.getComment():
+            comment = "\t// " + comment.replace('\n', '\n\t// ') + '\n'
+            disasm = comment + disasm
+
         # include disassembly
         disasm += "\t" + self.getDisasm()
-        # include comment
-        comment = self.getComment()
-        # comments are one-line, tabbed, and
-        if comment:
-            comment = "// " + comment.replace('\n', '\n// ') + '\n'
-            disasm = comment + disasm
+
+        # include repeatable comments for function calls in the same line
+        if self.isCode() and 'BL ' in self.getOrigDisasm():
+            repCmt = idc.get_func_cmt(self.getXRefsFrom()[0][0], repeatable=1)
+            repCmt = ' // ' + repCmt if repCmt else ''
+            disasm += repCmt
 
         disasm = self._convertTabs(disasm)
         return disasm
@@ -378,14 +387,14 @@ class Data:
             # adjust instruction spacing TODO: tabs or pads for instruction?
             output = instName + ' ' + output[len(instName):].lstrip()
 
+            # convert immediate reference instructions
+            output = self._convertImmediateReferences(output)
+
             # if the instruction is a pool instruction, the format should be changed
             try:
                     output = self._getPoolDisasm()
             except DataException:
                 pass
-
-            # convert immediate reference instructions
-            output = self._convertImmediateReferences(output)
 
             # if the instruction is an adc, replace it with a short
             if "ADR " in output:
@@ -440,6 +449,13 @@ class Data:
             content = data.getContent()
             if self.isPointer(content):
                 disasm = idc.GetDisasm(ea)  # very simple, this works.
+                contentData = Data(content)
+                # If it's a struct member, replace it with its hex, but keep the information
+                if '.' in disasm and (';' not in disasm or '.' in disasm[:disasm.index(';')]):
+                    disasm = 'DCD %s+0x%X // %s' % (contentData.getName(), content - contentData.ea,
+                                                    disasm[len('DCD '):])
+
+
             else:
                 # build the disassembly: this is for none-pointer symbols found in IDA (ex: word_0)
                 if idc.is_byte(flags): op = 'DCB'
@@ -623,15 +639,6 @@ class Data:
                     if Data(xrefsFrom[1][0]).ea == Data(xrefsFrom[1][1]).ea:
                         # the smaller one would be the pool location, as in the start of the array. (unless identical)
                         pool_ea = min(xrefsFrom[1][0], xrefsFrom[1][1])
-        # we're using the LDR RX, name format.
-        else:
-            # TODO: [BUG] this format now breaks! (Not enabled by default from IDA settings)
-            # the correct xref is the one with the identical name in the instruction
-            for xref in xrefsFrom[1]:
-                d = Data(xref)
-                if (d.getName() == words[2] or
-                                '+' in words[2] and d.getName() == words[2][:words[2].index('+')]):
-                    pool_ea = xref
 
         # assert that a pool_ea was found
         if pool_ea == -1:
@@ -639,6 +646,10 @@ class Data:
 
         # confirm that the content being loaded is an int. can't load anything else to a register!
         poolData = Data(pool_ea)
+
+        # every pool reference must have a name
+        if not poolData.getName():
+            raise (DataException("%07X: pool_ea %07X does not have a name" % (self.ea, pool_ea)))
 
         content = poolData.getContent()
 
@@ -650,24 +661,24 @@ class Data:
             raise(DataException("%07X: attempt to load non-int to register" % pool_ea))
 
         # write the actual pool value being loaded for readability
-        content = Data(content)
-        if content.isPointer(content.ea):
+        contentData = Data(content)
+        if contentData.isPointer(contentData.ea):
             # figure out unsync between xref of pool and content data... that's the index +!
             # depending on the data format of the value in the db, it may have no xrefs...
             if poolData.getXRefsFrom()[1]:
                 contentXref = poolData.getXRefsFrom()[1][0]
-                if contentXref - content.ea > 0:
-                    index = "+%d" % (contentXref - content.ea)
-                elif contentXref - content.ea  < 0:
-                    index = "-%d" % (content.ea - contentXref)
+                if contentXref - contentData.ea > 0:
+                    index = "+%d" % (contentXref - contentData.ea)
+                elif contentXref - contentData.ea  < 0:
+                    index = "-%d" % (contentData.ea - contentXref)
                 else:
                     index = ''
             else:
                 index = ''
 
-            cmt = "=%s%s" % (content.getName(), index)
+            cmt = "=%s%s" % (contentData.getName(), index)
         else:
-            cmt = "=0x%X" % content.ea
+            cmt = "=0x%X" % content
 
         # the amount of shift to apply depends on the instruction mode
         if arm:
@@ -681,8 +692,10 @@ class Data:
                 # normal case, PC is 2 instructions ahead
                 shift = 4
         # TODO: tabs or pads for instructions?
-        return "%s %s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, reg,
-                                                        pool_ea, self.ea, shift, cmt)
+        # return "%s %s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, reg,
+        #                                                 pool_ea, self.ea, shift, cmt)
+        return "%s %s %s // %s " % (inst, reg, poolData.getName(), cmt)
+
 
     def _isFunctionPointer(self, firstLineSplitDisasm):
         """
@@ -836,18 +849,35 @@ class Data:
         really are accessing that memory, but the compiler does not allow for this formatting, so the
         immedietes are calculated and provided as hex instead
         This converts instructions that look like this: ldr r2, [r2,#(dword_809EEF4+0x1F8 - 0x809f0e4)]
+
+        The order of when this is called matters. Do not call this after converting pool instructions.
         :param disasm: the source disassembly, it's returned if there's nothing to change
         :return: the source disasm or the new one if there are changes to be made
         """
         # TODO[BUG] (slight): doesn't account for cases like  'STRB R7, [R6,#byte_5]' because the pointe is not taken as valid.
-        if '#(' in disasm:
+        if '#' in disasm:
             xrefs = self.getXRefsFrom()
             # if any references are present at this line
             if len(xrefs[0]) != 0 or len(xrefs[1]) != 0:
                 # OK! we need to convert the immediate reference with a hexadecimal equivelant
-                expression = disasm[disasm.index('('):disasm.index(')')+1]
-                imms = idaapi.get_operand_immvals(self.ea, 1)
-                if len(imms) == 1:
-                    disasm = disasm[:disasm.index(expression)] + '0x%X' % (imms[0]) \
-                             + disasm[disasm.index(expression)+len(expression):] + ' // %s' % (expression)
+                if '#(' in disasm:
+                    expression = disasm[disasm.index('('):disasm.index(')')+1]
+                else:
+                    expression = disasm[disasm.index('#')+1:]
+                    if ' ' in expression:
+                        expression = expression[:expression.index(' ')]
+                    if ']' in expression:
+                        expression = expression[: expression.index(']')]
+                isDigit = expression.isdigit()
+                if not isDigit and  expression[0:2] == '0x':
+                    try:
+                        int(expression, 16)
+                        isDigit = True
+                    except:
+                        pass
+                if not isDigit:
+                    imms = idaapi.get_operand_immvals(self.ea, 1)
+                    if len(imms) == 1:
+                        disasm = disasm[:disasm.index(expression)] + '0x%X' % (imms[0]) \
+                                 + disasm[disasm.index(expression)+len(expression):] + ' // %s' % (expression)
         return disasm
