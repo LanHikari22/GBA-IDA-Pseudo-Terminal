@@ -6,7 +6,7 @@ idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
 import idc
 from IDAItems import Function, Data
-import TerminalModule, miscTools
+import TerminalModule
 
 
 class dis(TerminalModule.TerminalModule, object):
@@ -20,14 +20,26 @@ class dis(TerminalModule.TerminalModule, object):
         of disassemblies
         """
         super(dis, self).__init__(fmt)
-        self.registerCommand(self.push, "push ()")
-        self.registerCommand(self.extract, "extract ()")
-        self.registerCommand(self.checkExtractedCode, "checkExtractedCode ()")
-        self.registerCommand(self.rng, "rng (start_ea, end_ea)")
-        self.registerCommand(self.rngExterns, "rngExterns (start_ea, end_ea)")
-        self.registerCommand(self.rngSyncedExterns, "rngSyncedExterns (start_ea, end_ea)")
-        self.registerCommand(self.rngInc, "rngInc (start_ea, end_ea)")
+        self.registerCommand(self.push, "push()")
+        self.registerCommand(self.extract, "extract()")
+        self.registerCommand(self.checkExtractedCode, "checkExtractedCode()")
+        self.registerCommand(self.rng, "rng(start_ea, end_ea)")
+        self.registerCommand(self.rngExterns, "rngExterns(start_ea, end_ea)")
+        self.registerCommand(self.rngSyncedExterns, "rngSyncedExterns(start_ea, end_ea)")
+        self.registerCommand(self.rngInc, "rngInc(start_ea, end_ea)")
+        self.registerCommand(self.romIncs, "romIncs()")
+        self.registerCommand(self.addFile, "addFile(filename, start_ea, end_ea)")
+        self.registerCommand(self.formatGameFiles, "formatGameFiles()")
 
+
+    @staticmethod
+    def _getBaseFilename(file):
+        # type: (str) -> str
+        if '/' in file:
+            file = file[file.rindex('/') + 1:]
+        elif '\\' in file:
+            file = file[file.rindex('\\') + 1:]
+        return file
 
     def push(self):
         """
@@ -36,42 +48,40 @@ class dis(TerminalModule.TerminalModule, object):
         """
 
         # grab necessary variables from the environment and assert that they were given
-        err_msg = 'ERROR: environmental variables for dismProjPath, asmFiles, asmPath, incPath, and externsPath' \
+        err_msg = 'ERROR: environmental variables for dismProjPath, gameFiles, and incPath' \
                       + ' must be provided.'
         try:
             gameFiles = self.get('gameFiles')
-            asmPath = self.get('dismProjPath') + self.get('asmPath')
-            incPath = self.get('dismProjPath') + self.get('incPath')
-            if not gameFiles or not asmPath or not incPath:
+            projPath = self.get('dismProjPath')
+            incPath = self.get('incPath')
+            if not gameFiles or not projPath or not incPath:
                 print(err_msg)
                 return
         except TypeError:
             print(err_msg)
             return
 
-        keys = gameFiles.keys()
-        keys.sort()
-        for file in keys:
-            filename = file[:file.index('.')]
+        for file in sorted(gameFiles.keys(), key=gameFiles.__getitem__):
+            filename = self._getBaseFilename(file)
             if '.s' in file:
+                filename = filename[:filename.rindex('.')]
                 # include header into disassembly
                 disasm = '.include "%s.inc"\n\n' % (filename)
                 # write disassembly to file
-                spath = asmPath + filename + '.s'
-                print("> Disassembling %s.s to %s... " % (filename, spath))
+                print("> Disassembling %s... " % (file))
                 disasm += self.rng(*gameFiles[file])
-                asmfile = open(spath, 'w')
+                asmfile = open(projPath + file, 'w')
                 asmfile.write(disasm)
                 asmfile.close()
                 # write public interface and external symbol includes to header file
                 incpath = incPath + filename + '.inc'
-                print("Defining a header file for %s.s in %s..." % (filename, incpath))
+                print("Defining a header file in %s..." % (incpath))
                 headerFilename = filename.upper().replace('/', '_')
                 headerStart = '.ifndef INC_%s\n.equ INC_%s, 0\n\n' % (headerFilename, headerFilename)
                 headerEnd = '\n.endif // INC_%s\n' % (headerFilename)
                 incs = self.rngInc(*gameFiles[file])
                 externs = self.rngSyncedExterns(*gameFiles[file])
-                incfile = open(incpath, 'w')
+                incfile = open(projPath + incpath, 'w')
                 incfile.write(headerStart + incs + '\n' + externs + headerEnd)
                 incfile.close()
 
@@ -83,55 +93,23 @@ class dis(TerminalModule.TerminalModule, object):
         """
         # grab necessary variables from the environment and assert that they were given
         gameFiles = self.get('gameFiles')
-        binPath = self.get('dismProjPath') + self.get('binPath')
-        if not gameFiles or not binPath:
-            print('ERROR: environmental variables for dismProjPath, gameFiles, and binPath'
+        projPath = self.get('dismProjPath')
+        if not gameFiles or not projPath:
+            print('ERROR: environmental variable for gameFiles and dismProjPath'
                   + ' must be provided.')
             return
 
-        keys = gameFiles.keys()
-        keys.sort()
-        for file in keys:
-            if '.bin' in file:
+        for file in sorted(gameFiles.keys(), key=gameFiles.__getitem__):
+            if '.bin' in file or '.lz77' in file:
                 # get bytes in specified range
                 bytes = idc.get_bytes(gameFiles[file][0], gameFiles[file][1] - gameFiles[file][0])
 
                 # write bytes to bin file
-                bpath = binPath + file
-                print("Extracting %s into %s... " % (file, bpath))
-                binfile = open(bpath, 'wb')
+                print("Extracting %s... " % (file))
+                binfile = open(projPath + file, 'wb')
                 binfile.write(bytes)
                 binfile.close()
-        print("Extraction complete!")
-
-    def checkExtractedCode(self):
-        """
-        Checks if any gameFile that is not disassembled has any code in it
-        All code must be disassembled, and data should be extracted
-        If code is contained within extracted binaries, they are reported back
-        :return: [] if no code in extracted ranged. list[gameFile] otherwise.
-        """
-        # grab necessary variables from the environment and assert that they were given
-        gameFiles = self.get('gameFiles')
-        if not gameFiles:
-            print('ERROR: environmental variables for gameFiles'
-                  + ' must be provided.')
-            return
-        markedFiles = []
-        keys = gameFiles.keys()
-        keys.sort()
-        for file in keys:
-            if not '.s' in file:
-                # traverse the range, make sure it has no code
-                ea = gameFiles[file][0]
-                while ea < gameFiles[file][1]:
-                    d = Data.Data(ea)
-                    if (d.isCode()):
-                        markedFiles.append(file)
-                        break
-                    ea += d.getSize()
-        return markedFiles
-
+        print("Binary Extraction complete!")
 
     @staticmethod
     def rng(start_ea, end_ea, debug=False):
@@ -249,31 +227,34 @@ class dis(TerminalModule.TerminalModule, object):
 
         # compute includes, and find the ones not declared anywhere
         undeclaredXrefs = []
+        dataFileLabels = [] # those are declared in _rom.s and must not be .equ'd.
         for xref in xrefs:
             # figure out if it's in any include (within asmFile ranges)
-            keys = gameFiles.keys()
-            keys.sort()
             isDeclared = False
-            for file in keys:
+            for file in sorted(gameFiles.keys(), key=gameFiles.__getitem__):
                 if '.s' in file:
+                    filename = self._getBaseFilename(file)
                     # if xref is within file range
                     if gameFiles[file][0] <= xref < gameFiles[file][1]:
-                        if file not in includes:
-                            includes[file] = [xref]
+                        if filename not in includes:
+                            includes[filename] = (gameFiles[file][0], [xref])
                         else:
-                            includes[file].append(xref)
+                            includes[filename][1].append(xref)
                         # we found what file that xref belongs to now
                         isDeclared = True
                         break
+                else:
+                    dataFileLabels.append(gameFiles[file][0])
+
             # xref doesn't belong to any header file
             if not isDeclared and xref not in undeclaredXrefs:
                 undeclaredXrefs.append(xref)
 
         # output includes and specific usages
         output =  '/* External Symbols */\n'
-        for include in includes.keys():
+        for include, _ in sorted(includes.items(), key=lambda x:x[1][0]):
             output += '.include "%s.inc"\n' % (include[:include.index('.')])
-            for xref in includes[include]:
+            for xref in includes[include][1]:
                 # Only global if all symbols are defined somewhere. While actively disassembling, .equ is helpful
                 d = Data.Data(xref)
                 if d.isFunctionStart():
@@ -288,11 +269,16 @@ class dis(TerminalModule.TerminalModule, object):
         # output remaining xrefs
         if undeclaredXrefs:
             output += '\n/* Undeclared Symbols */\n'
+
         for xref in undeclaredXrefs:
+            # make sure the undeclared xref is not declared in _rom.s (data files)
             d = Data.Data(xref)
             name = d.getName()
             xref = d.ea
-            output += '.equ %s, 0x%07X\n' % (name, xref)
+            if xref in dataFileLabels:
+                output += '// .global %s\n' % (name)
+            else:
+                output += '.equ %s, 0x%07X\n' % (name, xref)
 
         return output
 
@@ -343,3 +329,150 @@ class dis(TerminalModule.TerminalModule, object):
         #     inc += ".equ %s, 0x%07X\n" % (name, ea)
         inc += "\n"
         return inc
+
+    def checkExtractedCode(self):
+        """
+        Checks if any gameFile that is not disassembled has any code in it
+        All code must be disassembled, and data should be extracted
+        If code is contained within extracted binaries, they are reported back
+        :return: [] if no code in extracted ranged. list[gameFile] otherwise.
+        """
+        # grab necessary variables from the environment and assert that they were given
+        gameFiles = self.get('gameFiles')
+        if not gameFiles:
+            print('ERROR: environmental variables for gameFiles'
+                  + ' must be provided.')
+            return
+        markedFiles = []
+        keys = gameFiles.keys()
+        keys.sort()
+        for file in keys:
+            if not '.s' in file:
+                # traverse the range, make sure it has no code
+                ea = gameFiles[file][0]
+                while ea < gameFiles[file][1]:
+                    d = Data.Data(ea)
+                    if (d.isCode()):
+                        markedFiles.append(file)
+                        break
+                    ea += d.getSize()
+        return markedFiles
+
+
+    def romIncs(self):
+        """
+        creates the .incs and .incbin as per the gamefiles defined.
+        This defines how all of the files are included together to make the final rom image. That is only true
+        if the range in gameFiles actually cover the entire ROM
+        :return: a string containing the includes to put in a rom.s file to include all files together
+        """
+        output = ''
+        gameFiles = self.get('gameFiles')
+        if not gameFiles:
+            print('ERROR: environmental variables for gameFiles'
+                  + ' must be provided.')
+            return
+
+        output = ''
+        for file in sorted(gameFiles.keys(), key=gameFiles.__getitem__):
+            if '.s' in file:
+                label = self._getBaseFilename(file)
+                label = label[:label.rindex('.')]
+                output += '%s:\n.include "%s"\n' % (label, file)
+            else:
+                d = Data.Data(gameFiles[file][0])
+                label = d.getName()
+                if not label:
+                    label = self._getBaseFilename(file)
+                    label = label[:label.rindex('.')]
+                output += '%s:\n.incbin "%s"\n' % (label, file)
+
+        return output
+
+    def addFile(self, filename, start_ea, end_ea):
+        """
+        Adds in a file, and recomputes the chunks if it's found within another file.
+        :param gameFiles: dictionary of filenames and ranges
+        :param filename: name of the file to be added
+        :param start_ea: the start of the range, inclusive
+        :param end_ea: the end of the range, exclusive
+        """
+        gameFiles = self.get('gameFiles')
+        changeChunks = False
+        chunkedFileName = ''
+        chunkedFileExt = ''
+        chunks = []
+        files = sorted(gameFiles.keys(), key=gameFiles.__getitem__)
+        for file in files:
+            fileNoExt = file[:file.rindex('.')]
+            ext = file[file.rindex('.')+1:]
+
+            if (gameFiles[file][0] < start_ea < gameFiles[file][1] and
+                    gameFiles[file][0] < end_ea < gameFiles[file][1]):
+                # if it's a chunked file already, we have to sync the chunks
+                if '_' in fileNoExt and fileNoExt[fileNoExt.rindex('_')+1:].isdigit():
+                    chunkedFileName = fileNoExt[:file.rindex('_')]
+                    chunkedFileExt = file[file.rindex('.')+1:]
+                    chunkedFileExt = file[file.rindex('.')+1:]
+                    chunkNo = int(fileNoExt[fileNoExt.rindex('_')+1:])
+                    chunkEnd = gameFiles[file][1]
+                    gameFiles[file] = (gameFiles[file][0], start_ea)
+                    gameFiles[filename] = (start_ea, end_ea)
+                    nextChunkName = '%s_%d.%s' % (chunkedFileName, chunkNo+1, ext)
+                    print(nextChunkName)
+                    if nextChunkName in gameFiles:
+                        chunks.append(gameFiles[nextChunkName]) # add modified range again later
+                    gameFiles[nextChunkName] = (end_ea, chunkEnd)
+                    changeChunks = True
+                else:
+                    # chunk the current file
+                    firstChunkName = '%s_0.%s' % (fileNoExt, ext)
+                    secondChunkName = '%s_1.%s' % (fileNoExt, ext)
+                    # replace file, with a chunked version of itself
+                    gameFiles[firstChunkName] = gameFiles[file]
+                    gameFiles.pop(file, None)
+                    # set chunk ranges
+                    chunkEnd = gameFiles[firstChunkName][1]
+                    gameFiles[firstChunkName] = (gameFiles[firstChunkName][0], start_ea)
+                    gameFiles[filename] = (start_ea, end_ea)
+                    gameFiles[secondChunkName] = (end_ea, chunkEnd)
+                break
+            elif start_ea == gameFiles[file][0] and end_ea < gameFiles[file][1]:
+                gameFiles[file] = (end_ea, gameFiles[file][1])
+                gameFiles[filename] = (start_ea, end_ea)
+                break
+            elif start_ea > gameFiles[file][0] and end_ea == gameFiles[file][1]:
+                gameFiles[file] = (gameFiles[file][0], start_ea)
+                gameFiles[filename] = (start_ea, end_ea)
+                break
+            elif start_ea == gameFiles[file][0] and end_ea == gameFiles[file][1]:
+                # simply rename exact matching range
+                gameFiles.pop(file, None)
+                gameFiles[filename] = (start_ea, end_ea)
+        if changeChunks:
+            print(chunkedFileName, chunkedFileExt)
+            for file in files:
+                if ('_' in file and file[:file.rindex('_')] == chunkedFileName
+                        and file[file.rindex('_')+1:file.rindex('.')].isdigit()):
+                    chunks.append(gameFiles[file])
+
+            # modify the chunks so they sync up in the game files
+            chunks.sort()
+            for i in range(len(chunks)):
+                gameFiles['%s_%d.%s' % (chunkedFileName, i, chunkedFileExt)] = chunks[i]
+
+    def formatGameFiles(self):
+        # type: (dict[str, (int, int)]) -> str
+        """
+        Outputs the game files in a good format. This allows for the dynamic modification of game files
+        :return:
+        """
+        gameFiles = self.get('gameFiles')
+        padSize = len("'start.s':        ")
+        output = ''
+        for file in sorted(gameFiles.keys(), key=gameFiles.__getitem__):
+            output += ("'" + file + "':" + (padSize-len(file)+1)*' ')
+            output += '(0x%07X, 0x%07X), # size=0x%X\n' % (gameFiles[file][0], gameFiles[file][1],
+                                                      gameFiles[file][1] - gameFiles[file][0])
+        return output
+

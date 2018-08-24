@@ -3,12 +3,13 @@
 # This module classifies a Data type and defines operations done on them using the IDA API
 #
 import idaapi
+idaapi.require("IDAItems.Instruction")
+
+import re
+import ida_bytes
 import idautils
 import idc
-import re
-
-import IDAItems
-import miscTools
+import Instruction
 
 
 class DataException(Exception):
@@ -308,7 +309,10 @@ class Data:
         comment = self.getComment()
         if self.getComment():
             comment = "\t// " + comment.replace('\n', '\n\t// ') + '\n'
-            disasm = comment + disasm
+            if self.isCode():
+                disasm = disasm + comment
+            else:
+                disasm = comment + disasm
 
         # include disassembly
         disasm += "\t" + self.getDisasm()
@@ -373,31 +377,30 @@ class Data:
         if idc.isCode(flags):
 
             # some instructions take no operands, like NOP
-            instName = disasm[:disasm.index(' ')] if ' ' in disasm else disasm
+            instName = idc.GetMnem(ea)
 
             # if the instruction is THUMB, it cannot have an 'S' in it... (except for branches)
             # the BIC instruction is not a branch, account for that
             isThumb = self.getSize() == 2
+
             isBranch = 'BIC' not in instName and instName[0] == 'B'
             hasCond = instName[-1] == 'S'
             if isThumb and not isBranch and hasCond:
                 output = instName[:-1] + ' ' + output[len(instName):].lstrip()
                 instName = instName[:-1]
 
-            # adjust instruction spacing TODO: tabs or pads for instruction?
+            # adjust instruction spacing TODO: tabs or pad`s for instruction?
             output = instName + ' ' + output[len(instName):].lstrip()
 
             # convert immediate reference instructions
             output = self._convertImmediateReferences(output)
 
             # if the instruction is a pool instruction, the format should be changed
-            try:
-                    output = self._getPoolDisasm()
-            except DataException:
-                pass
+            poolDisasm = self._getPoolDisasm()
+            if poolDisasm: output = poolDisasm
 
             # if the instruction is an adc, replace it with a short
-            if "ADR " in output:
+            if "ADR " in instName:
                 output = "DCW 0x%X // %s" % (self.getContent(), output)
                 output = self._convertData(output)
 
@@ -410,6 +413,7 @@ class Data:
 
     def _getFlags(self):
         return idc.GetFlags(self.ea)
+
 
     def _convertData(self, disasm):
         """
@@ -448,7 +452,7 @@ class Data:
             data = Data(ea)
             content = data.getContent()
             if self.isPointer(content):
-                disasm = idc.GetDisasm(ea)  # very simple, this works.
+                disasm = idc.GetDisasm(ea)
                 contentData = Data(content)
                 # If it's a struct member, replace it with its hex, but keep the information
                 if '.' in disasm and (';' not in disasm or '.' in disasm[:disasm.index(';')]):
@@ -456,6 +460,9 @@ class Data:
                                                     disasm[len('DCD '):])
 
 
+            elif ida_bytes.is_manual(self._getFlags(), 0):
+                # Manual forms put in IDA, just grab it. (This is for cases where computations are applied to data)
+                disasm = idc.GetDisasm(ea)
             else:
                 # build the disassembly: this is for none-pointer symbols found in IDA (ex: word_0)
                 if idc.is_byte(flags): op = 'DCB'
@@ -570,16 +577,76 @@ class Data:
     def _getPoolDisasm(self):
         # type: () -> str
         """
+        Disassembles pool in a linker compatible version. If the instruction is not a pool
+        instruction
+
+        :param ea: ea of inst
+        :return: disassembly with the correct LDR/STR [PC, ...] format or ''
+        :raise DataException: if an invalid state is entered while parsing the pool load
+        """
+        output = ''
+        if 'LDR' in idc.GetMnem(self.ea) and Instruction.isPoolLDR(self.ea):
+            insn = Instruction.Insn(self.ea)
+            inst = 'LDR'
+            reg = 'R%d' % (insn.ops[0].reg)
+
+            # retrieve the pool address from the instruction
+            pool_ea = insn.ops[1].addr
+
+            # confirm that the content being loaded is an int. can't load anything else to a register!
+            poolData = Data(pool_ea)
+
+            # every pool reference must have a name
+            if not poolData.getName():
+                raise (DataException("%07X: pool_ea %07X does not have a name" % (self.ea, pool_ea)))
+
+            content = poolData.getContent()
+
+            # if the pointer derefernced in the pool is an array, it's the first element being dereferenced
+            if type(content) == list:
+                content = content[0]
+
+            if type(content) != int and type(content) != long:
+                raise (DataException("%07X: attempt to load non-int to register" % pool_ea))
+
+            # write the actual pool value being loaded for readability
+            contentData = Data(content)
+            if contentData.isPointer(contentData.ea):
+                # figure out unsync between xref of pool and content data... that's the index +!
+                # depending on the data format of the value in the db, it may have no xrefs...
+                if poolData.getXRefsFrom()[1]:
+                    contentXref = poolData.getXRefsFrom()[1][0]
+                    if contentXref - contentData.ea > 0:
+                        index = "+%d" % (contentXref - contentData.ea)
+                    elif contentXref - contentData.ea < 0:
+                        index = "-%d" % (contentData.ea - contentXref)
+                    else:
+                        index = ''
+                else:
+                    index = ''
+
+                cmt = "=%s%s" % (contentData.getName(), index)
+            else:
+                cmt = "=0x%X" % content
+
+            output = "%s %s, %s // %s " % (inst, reg, poolData.getName(), cmt)
+        return output
+
+
+    def _OLDgetPoolDisasm(self):
+        # type: () -> str
+        """
         Converts pool to linker compatible version. If the instruction is not a pool
         instruction
 
         :param ea: ea of inst
-        :param arm: True if arm, false if not. -8/-4 (-2 instructions due to pipeline)
         :return: disassembly with the correct LDR/STR [PC, ...] format
         :raise: DataException if conversion is impossible
         """
 
         disasm = idc.GetDisasm(self.ea)
+        if ';' in disasm:
+            disasm = disasm[:disasm.index(';')]
 
         # must be a load or store
         if "LDR" not in disasm:

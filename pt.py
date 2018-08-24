@@ -1,12 +1,12 @@
 import idaapi
-idaapi.require("miscTools")
+idaapi.require("MiscTools.miscTools")
 idaapi.require("disasmTools")
 idaapi.require("fixTools")
 idaapi.require("SrchTools.srchTools")
 idaapi.require("TerminalModule")
 idaapi.require("Definitions.Environment")
 from Definitions import Environment
-import miscTools
+from MiscTools import miscTools
 import disasmTools
 import TerminalModule
 import fixTools

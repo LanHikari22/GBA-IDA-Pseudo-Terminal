@@ -12,10 +12,6 @@ env['compareBinPath'] = ''
 
 ## disassembly utils
 env['dismProjPath'] = ''
-# disassembled asm files go here
-env['asmPath'] = ''
-# extracted binaries go here
-env['binPath'] = ''
 # the path to put header *.inc files for the disassembly
 env['incPath'] = ''
 
