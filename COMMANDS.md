@@ -22,9 +22,11 @@ Contains all of the other terminal modules, as well as essential commands
 # dis
 This module contains utilities that help with disassembly exporting from IDA.
     The disassembly is in a format compatible with the none-arm-eabi-gcc assembler.
-- `push()` Automatcally generates disassembly, header, and external symbols for all asmFiles specified
-        in env['asmFiles'] and updates the files in the project folder specified
-- `extract()` Extracts all binary ranges specified in env['binFiles'] into *.bin files in the folder env['binPath']
+- `push()` Automatcally generates disassembly .s files and .inc headers for assembly files specified
+        in self.gameFiles, to self.projPath. Header files are put to the same relative path specified in
+        self.gameFiles, except in the folder specified by self.incPath.
+- `extract()` Binary extracts all files in self.gameFiles with an extension found in self.binAliases
+        to their specified relative addresses, in self.projPath.
 - `checkExtractedCode()` Checks if any gameFile that is not disassembled has any code in it
         All code must be disassembled, and data should be extracted
         If code is contained within extracted binaries, they are reported back
@@ -35,8 +37,8 @@ This module contains utilities that help with disassembly exporting from IDA.
         
 - `rngExterns(start_ea, end_ea)` creates .equs for all external symbols used in the range
         
-- `rngSyncedExterns(start_ea, end_ea)` The same as rngext(), except, where it can, it includes header files too!
-        This is based on the asmFiles found in env['asmFiles']
+- `rngSyncedExterns(start_ea, end_ea)` The same as rngExterns(), except it includes header files if they exist.
+        This is based on all header files for asm files in self.gameFiles.
         when a header file is included, used symbols from the header file are shown commented out after it
         
 - `rngInc(start_ea, end_ea)` Reports back the exposed (or public) symbols of the range

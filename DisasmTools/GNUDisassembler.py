@@ -1,18 +1,17 @@
 # @file disasmTools
-# provides utility commands for disassembling
+# This module allows for writing disassembly files that are compatible with the gnu
+# arm-none-eabi toolchain.
 import idaapi
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
-idaapi.require("TerminalModule")
 import idc
 from IDAItems import Function, Data
-import TerminalModule
 
 
 class GNUDisassembler:
     """
     This module contains utilities that help with disassembly exporting from IDA.
-    The disassembly is in a format compatible with the none-arm-eabi-gcc assembler.
+    The disassembly is in a format compatible with the none-arm-eabi-as assembler.
     """
     def __init__(self, gameFiles, projPath, incPath, binAliases):
         """
@@ -37,8 +36,9 @@ class GNUDisassembler:
 
     def push(self):
         """
-        Automatcally generates disassembly, header, and external symbols for all asmFiles specified
-        in env['asmFiles'] and updates the files in the project folder specified
+        Automatcally generates disassembly .s files and .inc headers for assembly files specified
+        in self.gameFiles, to self.projPath. Header files are put to the same relative path specified in
+        self.gameFiles, except in the folder specified by self.incPath.
         """
         for file in sorted(self.gameFiles.keys(), key=self.gameFiles.__getitem__):
             # filename = self._getBaseFilename(file)
@@ -68,7 +68,8 @@ class GNUDisassembler:
 
     def extract(self):
         """
-        Extracts all binary ranges specified in env['binFiles'] into *.bin files in the folder env['binPath']
+        Binary extracts all files in self.gameFiles with an extension found in self.binAliases
+        to their specified relative addresses, in self.projPath.
         """
         for file in sorted(self.gameFiles.keys(), key=self.gameFiles.__getitem__):
             # ensure the file is a binary file to be extracted
@@ -183,8 +184,8 @@ class GNUDisassembler:
 
     def rngSyncedExterns(self, start_ea, end_ea):
         """
-        The same as rngext(), except, where it can, it includes header files too!
-        This is based on the asmFiles found in env['asmFiles']
+        The same as rngExterns(), except it includes header files if they exist.
+        This is based on all header files for asm files in self.gameFiles.
         when a header file is included, used symbols from the header file are shown commented out after it
         :param start_ea: start ea of the range, inclusive
         :param end_ea: end ea of the range, exclusive
@@ -323,7 +324,6 @@ class GNUDisassembler:
                         break
                     ea += d.getSize()
         return markedFiles
-
 
     def romIncs(self):
         """
