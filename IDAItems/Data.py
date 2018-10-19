@@ -280,8 +280,8 @@ class Data:
                     disasm += '"'
                 elif chr(content[i]) == '"':
                     disasm += '\\\"'
-                elif not chr(content[i]).isspace():
-                    disasm += chr(content[i])
+                elif chr(content[i]) == '\\':
+                    disasm += '\\\\'
                 elif content[i] == 0x0A:
                     disasm += '\\n'
                     numNewLines -= 1
@@ -289,7 +289,12 @@ class Data:
                         disasm += '"\n\t.ascii "'
                     elif numNewLines == 1:
                         disasm += '"\n\t.asciz "'
+                elif chr(content[i]) == ' ':
+                    disasm += ' '
+                elif not chr(content[i]).isspace():
+                    disasm += chr(content[i])
                 else:
+                    # TODO [INVALID] arm-none-eabi doesn't recognize \xXX? \x seems to become a byte.
                     disasm += '\\x%02X' % content[i]
         elif idc.isData(flags):
             disasm = self._getDataDisasm(self.ea)

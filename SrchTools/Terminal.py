@@ -42,21 +42,20 @@ class SrchTerminal(TerminalModule.TerminalModule, object):
             """
             super(SrchTerminal.nextTerminal, self).__init__(fmt)
 
-            next = SrchTools.nextTools.next()
             # include commands
-            self.arm = next.arm
-            self.ascii = next.ascii
-            self.fakeinst = next.fakeinst
-            self.name = next.name
-            self.known = next.known
-            self.bin = next.bin
-            self.red = next.red
-            self.immref = next.immref
-            self.ret = next.ret
-            self.unkret = next.unkret
-            self.deadfunc = next.deadfunc
-            self.fakered = next.fakered
-            self.unkptr = next.unkptr
+            self.arm = SrchTools.nextTools.arm
+            self.ascii = SrchTools.nextTools.ascii
+            self.fakeinst = SrchTools.nextTools.fakeinst
+            self.name = SrchTools.nextTools.name
+            self.known = SrchTools.nextTools.known
+            self.bin = SrchTools.nextTools.bin
+            self.red = SrchTools.nextTools.red
+            self.immref = SrchTools.nextTools.immref
+            self.ret = SrchTools.nextTools.ret
+            self.unkret = SrchTools.nextTools.unkret
+            self.deadfunc = SrchTools.nextTools.deadfunc
+            self.fakered = SrchTools.nextTools.fakered
+            self.unkptr = SrchTools.nextTools.unkptr
 
             self.registerCommand(self.arm, "arm(search_ea, ui=True)")
             self.registerCommand(self.ascii, "ascii(search_ea, ui=True)")

@@ -2,15 +2,12 @@
 # utilities for searching for things in the IDB, as well as in binaries (and against the IDB) go here!
 import idaapi
 import idautils
-import idc
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 idaapi.require("TerminalModule")
 idaapi.require("SrchTools.nextTools")
 
-from SrchTools import nextTools
-import TerminalModule
 import os
 import re
 

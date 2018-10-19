@@ -7,6 +7,9 @@ from IDAItems import Data
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 
+from IDAItems import Data
+
+
 def forceItemOp(ea, op, *args, **kwargs):
     """
     This forces a change to an item, like MakeWord, in the database
@@ -21,6 +24,7 @@ def forceItemOp(ea, op, *args, **kwargs):
         idc.del_items(ea)
         success = op(*args, **kwargs)
     return success
+
 
 def getLZ77CompressedSize(compressed_ea):
     """
@@ -63,6 +67,7 @@ def getLZ77CompressedSize(compressed_ea):
             if size >= decompSize:
                 break
     return ea-compressed_ea
+
 
 def registerUncompFile(ea, force=True):
     # type: (int) -> bool
@@ -112,3 +117,127 @@ def registerUncompFile(ea, force=True):
 
     return True
 
+
+def delShiftedContent(ea):
+    d = Data.Data(ea)
+    content = d.getContent()
+    if (content) == list or not d.getXRefsFrom()[1] or content < 0x8000000 or not d.isPointer(content):
+        return False
+    dContent = Data.Data(content)
+    if content == dContent.ea or dContent.isCode():
+        return False
+    if not idc.del_items(dContent.ea, dContent.getSize()):
+        for i in range(dContent.ea, dContent.ea + dContent.getSize()):
+            idc.del_items(i, 1)
+    return True
+
+
+def delShiftedContentRange(start_ea, end_ea):
+    ea = start_ea
+    while ea < end_ea:
+        # print('%07X' % ea)
+        d = Data.Data(ea)
+        disasm = d.getDisasm()
+        if delShiftedContent(ea):
+            print('%07X: del content %s' % (ea, disasm))
+        ea += d.getSize()
+
+
+def unkRange(start_ea, end_ea):
+    ea = start_ea
+    for ea in range(start_ea, end_ea):
+        idc.del_items(ea, 1)
+
+
+def tillName(ea, f):
+    d = Data.Data(ea)
+    while True:
+        size = d.getSize()
+        f(d.ea)
+        d = Data.Data(d.ea + size)
+        if d.getName(): break
+    return d.ea
+
+
+def unkTillName(ea):
+    d = Data.Data(ea)
+    while True:
+        size = d.getSize()
+        idc.del_items(d.ea, d.getSize())
+        d = Data.Data(d.ea + size)
+        if d.getName(): break
+    return d.ea
+
+
+def arrTillName(ea):
+    if not Data.Data(ea).isPointer(ea):
+        return False
+    name_ea = unkTillName(ea)
+    idc.make_array(ea, name_ea - ea)
+    return True
+
+
+def unk2Arr(ea):
+    start_ea = ea
+    d = Data.Data(ea)
+    if not d.getName() or not d.isPointer(d.ea):
+        return False
+    # ensure that it's all unknowns till next name
+    allUnks = True
+    while True:
+        allUnks = idc.isUnknown(idc.GetFlags(ea))
+        ea += 1
+        if idc.Name(ea) or not allUnks: break
+    if not allUnks:
+        return False
+    arrTillName(start_ea)
+    return True
+
+
+def unk2ArrRng(start_ea, end_ea):
+    """
+    converts all completely unknowns to byte arrays
+    """
+    d = Data.Data(start_ea)
+    while d.ea < end_ea:
+        if d.getName() and idc.isUnknown(idc.GetFlags(d.ea)):
+            name = d.getName()
+            if unk2Arr(d.ea): print('%s -> %s' % (name, d.getName()))
+            d = Data.Data(d.ea)
+        d = Data.Data(d.ea + d.getSize())
+
+
+def unksToArrs(start_ea, end_ea):
+    """
+    linear addresses to pointers of the unks to turn to arrays
+    """
+    ea = start_ea
+    while ea < end_ea:
+        d = Data.Data(ea)
+        ea += d.getSize()
+        content = d.getContent()
+        if type(content) == list or not idc.isUnknown(idc.GetFlags(content)) or not d.isPointer(content):
+            continue
+        print('%07X' % content)
+        arrTillName(content)
+
+
+def delRange(start_ea, end_ea):
+    status = True
+    for ea in range(start_ea, end_ea):
+        idc.del_items(ea, 1)
+    return status
+
+
+def pointerOf(ea):
+    d = Data.Data(ea)
+    c = d.getContent();
+    # bit 31 set for compressed pointers
+    isCompressedPointer = c & (1 << 31)
+    if isCompressedPointer: c -= (1 << 31)
+    if type(c) != list and d.isPointer(c):
+        if isCompressedPointer:
+            return c + (1 << 31)
+        return c
+    else:
+        return -1
