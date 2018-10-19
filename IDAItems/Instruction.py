@@ -88,7 +88,7 @@ class Insn:
             elif type == ida_ua.o_imm:
                 print('op %d: imm (0x%X)' % (i, op.value))
             elif type == ida_ua.o_mem:
-                print('op %d: mem (%s)' % (i, idc.Name(op.addr)))
+                print('op %d: mem 0x%07X <%s>' % (i, idc.Name(op.addr)))
             elif type == ida_ua.o_phrase:
                 print('op %d: phrase (R%d, R%d)' % (i, op.reg, op.specflag1)) # specflag1 has Rz in 'LDR Rx, [Ry, Rz]'
             elif type == ida_ua.o_displ:
