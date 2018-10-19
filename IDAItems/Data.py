@@ -3,18 +3,18 @@
 # This module classifies a Data type and defines operations done on them using the IDA API
 #
 import idaapi
+idaapi.require("IDAItems.Instruction")
+
+import re
+import ida_bytes
 import idautils
 import idc
-import re
-
-import IDAItems
-import miscTools
+import Instruction
 
 
 class DataException(Exception):
     def __init__(self, s):
         super(Exception, self).__init__(s)
-
 
 # noinspection PyPep8Naming
 class Data:
@@ -29,6 +29,7 @@ class Data:
         # the item.
         size = 0
         ranLoop = False
+        # TODO: [SLOW] bottleneck algorithm (especially for big arrays, accessed at index 0x100 or so)
         while idc.get_item_size(ea) > size:
             ranLoop = True
             size = idc.get_item_size(ea)
@@ -103,8 +104,12 @@ class Data:
         # Find all data references to item
         for ref in idautils.DataRefsTo(self.ea):
             drefs.append(ref)
+        # TODO: why -1?? remove if redundant
         for ref in idautils.DataRefsTo(self.ea - 1):  # needed in case this is a code item
             drefs.append(ref)
+        for ref in idautils.DataRefsTo(self.ea + 1):  # needed in case this is a code item
+            drefs.append(ref)
+
 
         return (crefs, drefs)
 
@@ -149,9 +154,8 @@ class Data:
                 output = bytes
             else:
                 output = self._combineBytes(bytes, self.getSize())[0]
-
         elif idc.isStruct(flags):
-            pass
+            output = [ord(char) for char in idc.get_bytes(self.ea, self.getSize())]
         elif idc.isData(flags):
             # normal case, build up a u8, u16, or u32
             if idc.is_data(flags) and (idc.is_byte(flags) and self.getSize() == 1
@@ -172,9 +176,7 @@ class Data:
                 elemsPerLine = len(firstLineSplitDisasm) - 1  # don't include type, ex: DCB 0, 4, 5, 0x02, 0
 
                 # Grab all of the bytes in the array
-                bytes = []
-                for char in idc.get_bytes(self.ea, idc.get_item_size(self.ea)):
-                    bytes.append(ord(char))
+                bytes = [ord(char) for char in idc.get_bytes(self.ea, idc.get_item_size(self.ea))]
 
                 # figure out datatype to convert the array to be of
                 bytesPerElem = dataType == 'DCB' and 1 \
@@ -191,6 +193,7 @@ class Data:
             # unknown data elements are always 1 byte in size!
             output = ord(idc.get_bytes(self.ea, 1))
             if bin: output = [output]
+
         return output
 
     def withinFunction(self):
@@ -260,15 +263,40 @@ class Data:
         """
         flags = idc.GetFlags(self.ea)
         if idc.isStruct(flags):
-            disasm = "INVALID"
+            disasm = self._getStructDisasm(self.ea)
+            # disasm = "INVALID"
         elif idc.isAlign(flags):
             disasm = idc.GetDisasm(self.ea)
+            disasm = self._convertAlignDisasm(disasm)
+        elif idc.isASCII(flags):
+            content = self.getContent()
+            numNewLines = content.count(0x0A)
+            if numNewLines > 1:
+                disasm = '.ascii "'
+            else:
+                disasm = '.asciz "'
+            for i in range(len(content)):
+                if content[i] == 0x00:
+                    disasm += '"'
+                elif chr(content[i]) == '"':
+                    disasm += '\\\"'
+                elif not chr(content[i]).isspace():
+                    disasm += chr(content[i])
+                elif content[i] == 0x0A:
+                    disasm += '\\n'
+                    numNewLines -= 1
+                    if numNewLines > 1:
+                        disasm += '"\n\t.ascii "'
+                    elif numNewLines == 1:
+                        disasm += '"\n\t.asciz "'
+                else:
+                    disasm += '\\x%02X' % content[i]
         elif idc.isData(flags):
             disasm = self._getDataDisasm(self.ea)
         else:
             disasm = idc.GetDisasm(self.ea)
             disasm = self._filterComments(disasm)
-            while '  ' in disasm: disasm = disasm.replace('  ', ' ')
+            disasm = disasm.replace('  ', ' ')
         return disasm
 
     def getDisasm(self):
@@ -277,15 +305,17 @@ class Data:
         """
         disasm = self.getOrigDisasm()
         flags = idc.GetFlags(self.ea)
-        if idc.isAlign(flags):
-            disasm = self._convertAlignDisasm(disasm)
-        elif idc.isData(flags) or idc.isUnknown(flags):
+        if idc.isData(flags) or idc.isUnknown(flags):
             disasm = self._convertData(disasm)
         elif idc.isCode(flags):
             disasm = self._convertCode(self.ea, disasm)
             # make code small case
             disasm = self._lowerCode(disasm)
-        disasm = self._convertTabs(disasm)
+        elif idc.isAlign(flags):
+            disasm = self._convertAlignDisasm(disasm)
+
+        # TODO tabs or spaces? tabs for now
+        # disasm = self._convertTabs(disasm)
         return disasm
 
     def getFormattedDisasm(self):
@@ -297,40 +327,51 @@ class Data:
         disasm = ''
         # include label
         if name:
-            disasm = name + ":"
+            disasm = name + ':'
             # only add a new line for code labels
             if self.isCode():
                 disasm += "\n"
 
         # include comment
         comment = ''
+        inlineComment = ''
         # include the data item's comment
         comment = self.getComment()
         if self.getComment():
-            comment = "\t// " + comment.replace('\n', '\n\t// ') + '\n'
-            disasm = comment + disasm
+            if '<il>' in comment:
+                splitIdx = comment.index('<il>')
+                inlineComment = comment[splitIdx+len('<il>'):]
+                comment = comment[:splitIdx]
+            if comment:
+                comment = "// " + comment.replace('\n', '\n\t// ') + '\n'
+                if self.isCode():
+                    disasm = disasm + '\t' + comment # label comes before comment
+                else:
+                    # for data, comment comes before label
+                    if name:
+                        disasm = disasm + '\n'
+                    disasm = disasm + '\t' + comment # label comes before comment
 
         # include disassembly
-        disasm += "\t" + self.getDisasm()
+        if self.isCode() or not name:
+            disasm += '\t' + self.getDisasm()
+        else:
+            if comment:
+                disasm += '\t' + self.getDisasm()
+            else:
+                disasm += ' ' + self.getDisasm()
 
         # include repeatable comments for function calls in the same line
         if self.isCode() and 'BL ' in self.getOrigDisasm():
             repCmt = idc.get_func_cmt(self.getXRefsFrom()[0][0], repeatable=1)
             repCmt = ' // ' + repCmt if repCmt else ''
             disasm += repCmt
+        if inlineComment:
+            disasm += ' // ' + inlineComment
 
-        disasm = self._convertTabs(disasm)
+        # TODO: tabs or spaces?
+        # disasm = self._convertTabs(disasm)
         return disasm
-
-    def findPoolFunction(self):
-        # type: () -> int
-        """
-        If this data item is within the pool of a function, that function's ea is returned
-        otherwise, None is returned. The function is first found by traversing back in ea, and computing the poolsize
-        of the function. If that matches, then the data itsem must have at least one code xref from that function.
-        :return: None or the start address of the function containing the data item in its pool
-        """
-        raise (NotImplemented())
 
     def getDefinition(self):
         # type: () -> str
@@ -373,31 +414,30 @@ class Data:
         if idc.isCode(flags):
 
             # some instructions take no operands, like NOP
-            instName = disasm[:disasm.index(' ')] if ' ' in disasm else disasm
+            instName = idc.GetMnem(ea)
 
             # if the instruction is THUMB, it cannot have an 'S' in it... (except for branches)
             # the BIC instruction is not a branch, account for that
             isThumb = self.getSize() == 2
-            isBranch = 'BIC' not in instName and instName[0] == 'B'
+
+            isBranch = instName[0] == 'B' and 'BIC' not in instName
             hasCond = instName[-1] == 'S'
             if isThumb and not isBranch and hasCond:
                 output = instName[:-1] + ' ' + output[len(instName):].lstrip()
                 instName = instName[:-1]
 
-            # adjust instruction spacing TODO: tabs or pads for instruction?
+            # adjust instruction spacing TODO: tabs or pad`s for instruction?
             output = instName + ' ' + output[len(instName):].lstrip()
 
             # convert immediate reference instructions
             output = self._convertImmediateReferences(output)
 
             # if the instruction is a pool instruction, the format should be changed
-            try:
-                    output = self._getPoolDisasm()
-            except DataException:
-                pass
+            poolDisasm = self._getPoolDisasm()
+            if poolDisasm: output = poolDisasm
 
             # if the instruction is an adc, replace it with a short
-            if "ADR " in output:
+            if "ADR " in instName:
                 output = "DCW 0x%X // %s" % (self.getContent(), output)
                 output = self._convertData(output)
 
@@ -410,6 +450,7 @@ class Data:
 
     def _getFlags(self):
         return idc.GetFlags(self.ea)
+
 
     def _convertData(self, disasm):
         """
@@ -431,12 +472,71 @@ class Data:
         return disasm.replace(';', ' //', disasm.count(';'))
         pass
 
+    def _getArrDisasm(self, ea, elemsPerLine, dataType):
+        # type: (int, int, str) -> str
+        """
+
+        :param ea: linear address to disassemble
+        :param elemsPerLine: number of elements to disassemble in one line
+        :param dataType: 'DCB', 'DCW', 'DCD', etc
+        :return: disassembly string
+        """
+        # Grab all of the bytes in the array
+        arr = self.getContent()
+
+        # whether to display a name, or data, is determiend by the xrefs from this item!
+        xrefs = self.getXRefsFrom()
+
+        # only bother to check for names if it's an array of words
+        wordArray = dataType == 'DCD'
+
+        # generate disassembly for array
+        disasm = dataType + ' '
+        elemIndex = 0
+        for elem in arr:
+            # tab if new line
+            if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
+            # add element and increment counter until new line
+            # if it's a pointer and defined as an xref, display its label not just the number
+            # isPointer is a bottleneck call, so prefer to call it last
+            if wordArray and (elem in xrefs[1] or elem in xrefs[0]) and self.isPointer(elem):
+                # TODO: maybe you ahould get the name of Data.Data(elem) also, for +index
+                elemEA = Data(elem).ea
+                name = idc.Name(elemEA)
+                if name:
+                    offset = elem - elemEA
+                    if offset != 0:
+                        offset = '+%d' % offset
+                    else:
+                        offset = ''
+                    disasm += "%s%s, " % (name, offset)
+                else:
+                    disasm += '0x%X, ' % elem
+            else:
+                disasm += '0x%X, ' % elem
+
+            elemIndex += 1
+
+            # if we reach the number of elements a line, we add a new line
+            if elemIndex % elemsPerLine == 0:
+                # replace ", " at the end if present
+                disasm = disasm[len(disasm) - 2:] == ', ' and disasm[:-2] or disasm
+                # advance for the next line
+                disasm += "\n"
+
+        # remove ", " at the end if present
+        disasm = disasm[len(disasm) - 2:] == ', ' and disasm[:-2] or disasm
+        # remove new line at the end if present
+        disasm = disasm[len(disasm) - 1:] == '\n' and disasm[:-1] or disasm
+
+        return disasm
+
     def _getDataDisasm(self, ea, elemsPerLine=-1):
         """
         You cannot get array data using getdisasm. The disassembly has to be extracted differently.
         This identifies the data in question, and gets its disassembly
         :param ea: the effective address of the item to get the disassembly of
-        :param elemsPerLine: if 0, maximum will be used. if <0, it'll be parsed from the database. otherwise, it's n.
+        :param elemsPerLine: if 0, maximum (8) will be used. if <0, it'll be parsed from the database. otherwise, it's n.
         :return: the disasssembly of the data item
         """
         # First, do the easy cases that just work with GetDisasm
@@ -447,8 +547,8 @@ class Data:
             # normal case where an int is not misread as a reference
             data = Data(ea)
             content = data.getContent()
-            if self.isPointer(content):
-                disasm = idc.GetDisasm(ea)  # very simple, this works.
+            if data.getXRefsFrom()[1] and self.isPointer(content):
+                disasm = idc.GetDisasm(ea)
                 contentData = Data(content)
                 # If it's a struct member, replace it with its hex, but keep the information
                 if '.' in disasm and (';' not in disasm or '.' in disasm[:disasm.index(';')]):
@@ -456,6 +556,9 @@ class Data:
                                                     disasm[len('DCD '):])
 
 
+            elif ida_bytes.is_manual(self._getFlags(), 0):
+                # Manual forms put in IDA, just grab it. (This is for cases where computations are applied to data)
+                disasm = idc.GetDisasm(ea)
             else:
                 # build the disassembly: this is for none-pointer symbols found in IDA (ex: word_0)
                 if idc.is_byte(flags): op = 'DCB'
@@ -469,64 +572,21 @@ class Data:
             firstLineSplitDisasm = list(filter(None, re.split('[ ,]', idc.GetDisasm(ea))))
             dataType = firstLineSplitDisasm[0]
 
-            # Grab all of the bytes in the array
-            arr = self.getContent()
-
             # determine the number of elements per line, if 0 (default) is specified, then it's parsed instead
             if elemsPerLine < 0:
                 commentWords = len(list(filter(None, re.split('[ ,]', self.getComment()))))
                 # -1 to not include type, ex: DCB, DCD... But comments can exist on the first line too!
                 elemsPerLine = len(firstLineSplitDisasm) - 1 - commentWords
-            elif elemsPerLine == 0:  # when specifying 0, all will show in one line!
-                elemsPerLine = len(arr)
+            elif elemsPerLine == 0:  # when specifying 0, show MAX_ELEMENTS elements
+                elemsPerLine = 8
+
+            return self._getArrDisasm(ea, elemsPerLine, dataType)
 
 
-            # whether to display a name, or data, is determiend by the xrefs from this item!
-            xrefs = self.getXRefsFrom()
+    def _getStructDisasm(self, ea):
+        # type: (int) -> str
+        return self._getArrDisasm(ea, 8, 'DCB')
 
-            # only bother to check for names if it's an array of words
-            wordArray = dataType == 'DCD'
-
-            # generate disassembly for array
-            disasm = dataType + ' '
-            elemIndex = 0
-            for elem in arr:
-                # tab if new line
-                if disasm[-1] == '\n': disasm += '\t%s' % (dataType + ' ')
-                # add element and increment counter until new line
-                # if it's a pointer and defined as an xref, display its label not just the number
-                # TODO: isPointer is a bottleneck call, so prefer to call it last
-                if wordArray and (elem in xrefs[1] or elem in xrefs[0]) and self.isPointer(elem):
-                    # TODO: maybe you ahould get the name of Data.Data(elem) also, for +index
-                    elemEA = Data(elem).ea
-                    name = idc.Name(elemEA)
-                    if name:
-                        offset = elem - elemEA
-                        if offset != 0:
-                            offset = '+%d' % offset
-                        else:
-                            offset = ''
-                        disasm += "%s%s, " % (name, offset)
-                    else:
-                        disasm += '0x%X, ' % elem
-                else:
-                    disasm += '0x%X, ' % elem
-
-                elemIndex += 1
-
-                # if we reach the number of elements a line, we add a new line
-                if elemIndex % elemsPerLine == 0:
-                    # replace ", " at the end if present
-                    disasm = disasm[len(disasm) - 2:] == ', ' and disasm[:-2] or disasm
-                    # advance for the next line
-                    disasm += "\n"
-
-            # remove ", " at the end if present
-            disasm = disasm[len(disasm) - 2:] == ', ' and disasm[:-2] or disasm
-            # remove new line at the end if present
-            disasm = disasm[len(disasm) - 1:] == '\n' and disasm[:-1] or disasm
-
-            return disasm
 
     def _filterComments(self, disasm):
         # filter comments out. this must be a one-line disasm.
@@ -555,31 +615,108 @@ class Data:
 
     def isPointer(self, ea):
         """
-        an ea is a pointer if it has a label, and if it has a possible value for physical addressing.
-        any value less than 0x02000000 or greater than 0x0E010000 is not likely a pointer as per the
-        gbatek documentation. values from the range [0, 0x3FFF] are BIOS pointers, but this is a very small minority
-        and is not mainly manipulated by game logic like other pointers
-        Never call this too much in arrays. It's a bottleneck function, it takes a while to get the name of an element
+        an ea is likely a pointer if it has a possible value for physical addressing.
         :param ea: linear address of the data item
         :return: True if it's a pointer
         """
-        if 0x02000000 <= ea <= 0x0E010000 and idc.Name(Data(ea).ea) != '':
+        if (0x02000000 <= ea < 0x02040000 or
+                   0x03000000 <= ea < 0x03008000 or
+                   0x04000000 <= ea < 0x04000400 or
+                   0x08000000 <= ea < 0x09FFFFFF):
             return True
         return False
 
     def _getPoolDisasm(self):
         # type: () -> str
         """
+        Disassembles pool in a linker compatible version. If the instruction is not a pool
+        instruction
+
+        :param ea: ea of inst
+        :return: disassembly with the correct LDR/STR [PC, ...] format or ''
+        :raise DataException: if an invalid state is entered while parsing the pool load
+        """
+        output = ''
+        if 'LDR' in idc.GetMnem(self.ea) and Instruction.isPoolLDR(self.ea):
+            insn = Instruction.Insn(self.ea)
+            inst = 'LDR'
+            reg = 'R%d' % (insn.ops[0].reg)
+
+            # retrieve the pool address from the instruction
+            pool_ea = insn.ops[1].addr
+            poolData = Data(pool_ea)
+            offset = pool_ea - poolData.ea
+
+            # every pool reference must have a name
+            if not poolData.getName():
+                raise (DataException("%07X: pool_ea %07X does not have a name" % (self.ea, pool_ea)))
+
+            content = poolData.getContent()
+
+            # the pool might point to an array. The offset determines which element is loaded
+            if type(content) == list:
+                content = content[offset/(poolData.getSize()/len(content))]
+
+            if type(content) != int and type(content) != long:
+                raise (DataException("%07X: attempt to load non-int to register" % pool_ea))
+
+            # write the actual pool value being loaded for readability
+            contentData = Data(content)
+            if contentData.isPointer(contentData.ea):
+                # figure out unsync between xref of pool and content data... that's the index +!
+                # depending on the data format of the value in the db, it may have no xrefs...
+                if poolData.getXRefsFrom()[1]:
+                    contentXref = poolData.getXRefsFrom()[1][0]
+                    if contentXref - contentData.ea > 0:
+                        index = "+%d" % (contentXref - contentData.ea)
+                    elif contentXref - contentData.ea < 0:
+                        index = "-%d" % (contentData.ea - contentXref)
+                    else:
+                        index = ''
+                else:
+                    index = ''
+
+                cmt = "=%s%s" % (contentData.getName(), index)
+            else:
+                cmt = "=0x%X" % content
+
+            # in case pool_ea is within an array, then it could be offset
+            if offset:
+                offset = '+%d' % offset
+            else:
+                offset = ''
+
+            output = "%s %s, %s%s // %s " % (inst, reg, poolData.getName(), offset, cmt)
+
+            # TODO: old output style for debugging purposes
+            # if self.getSize() == 4:
+            #     shift = 8
+            # elif (pool_ea - self.ea - 4) % 4 != 0:
+            #     # to achieve word alignment, we round down to the last word aligned value
+            #     shift = 2
+            # else:
+            #     # normal case, PC is 2 instructions ahead
+            #     shift = 4
+            #
+            # output =  "%s %s, [PC, #0x%07X-0x%07X-%d] // %s" % (inst, reg,
+            #                                                    pool_ea, self.ea, shift, cmt)
+        return output
+
+
+    def _OLDgetPoolDisasm(self):
+        # type: () -> str
+        """
         Converts pool to linker compatible version. If the instruction is not a pool
         instruction
 
         :param ea: ea of inst
-        :param arm: True if arm, false if not. -8/-4 (-2 instructions due to pipeline)
         :return: disassembly with the correct LDR/STR [PC, ...] format
         :raise: DataException if conversion is impossible
         """
 
         disasm = idc.GetDisasm(self.ea)
+        if ';' in disasm:
+            disasm = disasm[:disasm.index(';')]
 
         # must be a load or store
         if "LDR" not in disasm:
@@ -847,7 +984,7 @@ class Data:
         """
         IDA puts references/symbols in immediete values as a way of indicating that those instructions
         really are accessing that memory, but the compiler does not allow for this formatting, so the
-        immedietes are calculated and provided as hex instead
+        immediates are calculated and provided as hex instead
         This converts instructions that look like this: ldr r2, [r2,#(dword_809EEF4+0x1F8 - 0x809f0e4)]
 
         The order of when this is called matters. Do not call this after converting pool instructions.

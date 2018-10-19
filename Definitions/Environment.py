@@ -2,30 +2,30 @@
 # To modify environmental variables, run pt.env(). Maintain a local file with pt.env() calls to set the
 # environment correctly. (or modify this file, if you want...)
 
-env = dict()
+try:
+    # hacky header-like behavior. This is because the environment is rewritten by
+    # external scripts, but modules rely on it existing upon initiation, so they import this.
+    # So the external script should define env, otherwise the default is this.
+    env
+except NameError:
+    env = dict()
 
-## ROM Paths
-env['ROMPath'] = ''
+    ## ROM Paths
+    env['ROMPath'] = ''
+    env['elfPath'] = ''
 
-## search utils
-env['compareBinPath'] = ''
+    ## search utils
+    env['compareBinPath'] = ''
 
-## disassembly utils
-env['dismProjPath'] = ''
-# disassembled asm files go here
-env['asmPath'] = ''
-# extracted binaries go here
-env['binPath'] = ''
-# the path to put header *.inc files for the disassembly
-env['incPath'] = ''
-
-# dictionary of filename and tuple of addresses: (Ex: {"start.s":(0x8000000, 0x80002CC)}
-# The file extension determines the type disassembled.
-# file.s    | Code is disassembled
-# file.bin  | The binary content is extracted
-env['gameFiles'] = None
-# TODO: Not supported yet
-# this includes the specific gameFiles to be updated. Set this to an empty dictionary, and all gameFiles are updated.
-# When working no specific files, set them here, and only those files and their dependencies are updated.
-# This can speed up disassembly operations
-# env['gameFilesUpdate'] = None
+    ## disassembly utils
+    env['dismProjPath'] = ''
+    # the path to put header *.inc files for the disassembly
+    env['incPath'] = ''
+    # aliases for file extensions of files to be binary extracted, not disassembled
+    env['binAliases'] = None
+    # dictionary of filename and tuple of addresses: (Ex: {"start.s":(0x8000000, 0x80002CC)}
+    # The file extension determines the type disassembled.
+    # file.s    | Code is disassembled
+    # file.bin  | The binary content is extracted. Applies to all extentions in binAliases.
+    env['gameFiles'] = None
+    # TODO: Not supported yet

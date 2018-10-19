@@ -1,3 +1,6 @@
+"""
+An incomplete instruction decoder that does not rely on IDA's instruction analysis to decode instructions
+"""
 import idaapi
 
 # Magic to identify instructions

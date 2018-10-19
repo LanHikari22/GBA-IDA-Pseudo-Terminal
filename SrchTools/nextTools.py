@@ -15,31 +15,16 @@ from IDAItems import Function, Data, InstDecoder
 import TerminalModule
 
 
-class next(TerminalModule.TerminalModule, object):
+class next:
     """
     A collection of tools that find the next occurrance of a specific type of item
     """
 
-    def __init__(self, fmt='[+] next (occurrence of something tools)'):
+    def __init__(self):
         """
         This module is responsible for printing disassemblies and necessary compoents
         of disassemblies
         """
-        super(next, self).__init__(fmt)
-
-        self.registerCommand(self.arm, "arm (search_ea, ui=True)")
-        self.registerCommand(self.ascii, "ascii (search_ea, ui=True)")
-        self.registerCommand(self.fakeinst, "fakeinst (search_ea, ui=True)")
-        self.registerCommand(self.name, "name (search_ea, ui=True, hexOut=True)")
-        self.registerCommand(self.known, "known (search_ea, ui=True)")
-        self.registerCommand(self.bin, "bin (search_ea, ui=True)")
-        self.registerCommand(self.red, "red (search_ea, ui=True)")
-        self.registerCommand(self.immref, "immref (search_ea, ui=True)")
-        self.registerCommand(self.ret, "ret (search_ea, ui=True, hexOut=True)")
-        self.registerCommand(self.unkret, "unkret (search_ea, ui=True, hexOut=True)")
-        self.registerCommand(self.deadfunc, "deadfunc (ea, ui=True, hexOut=True)")
-        self.registerCommand(self.fakered, "fakered (ea, ui=True, hexOut=True)")
-
         # figure out the very last ea reachable
         self.end_ea = 0
         for seg in idautils.Segments():
@@ -126,7 +111,7 @@ class next(TerminalModule.TerminalModule, object):
                 0xB85D, 0xB88B, 0xB8A3]
 
 
-    def name(self, ea, ui=True, hexOut=True):
+    def name(self, ea, ui=True, hexOut=True, reverse=False):
         """
         Finds the next ea with which a name exists
         :param ea: ea to start searching from
@@ -461,3 +446,52 @@ class next(TerminalModule.TerminalModule, object):
         if ui: idc.jumpto(end_red_ea - 2)
         if hexOut: return '(%07X, %07X)' % (start_ea, end_red_ea)
         return (start_ea, end_red_ea)
+
+    def unkptr(self, ea, end_ea=0x08800000, rom=True, ui=True, hexOut=True):
+        """
+
+        :param ea: ea to start searching from
+        :param ui: if True, jump to address automatically
+        :param end_ea: the last address of the search range. If not specified, default is used.
+        :param hexOut: output hex formatted ea range instead
+        :return: range of ea of next unknown/unexplored pointer
+        """
+
+        output = idaapi.BADADDR
+
+        # advance an element so multiple calls to this function can chain
+        d = Data.Data(ea)
+        ea += d.getSize()
+        # ea must be divisible by 4, since all pointers are 32-bit
+        if ea % 4 != 0:
+            ea += 4 - (ea % 4)
+
+        while ea < end_ea:
+            d = Data.Data(ea)
+            chars = idc.get_bytes(ea, 4)
+            dword = 0
+            for i in range(len(chars)):
+                dword += ord(chars[i]) << 8*i
+            # compressed pointers may have bit 31 set, so remove it.
+            # if dword % (1<<31):
+            #     dword -= 1<<31
+
+            # check if dword is a valid pointer
+            if rom:
+                inRange = 0x08000000 <= dword < 0x08800000 #0x09FFFFFF
+            else:
+                inRange = (0x02000000 <= dword < 0x02040000 or
+                           0x03000000 <= dword < 0x03008000 or
+                           0x08000000 <= dword < 0x08800000)
+            if (inRange):
+                if not d.isCode() and not d.getXRefsFrom()[1]:
+                    output = ea
+                    if hexOut: print('%07X: %07X <%s>' % (ea, dword, Data.Data(dword).getName()))
+                    break
+            if d.getXRefsFrom()[1]:
+                ea += d.getSize()
+                ea += 4 - (ea % 4) if ea % 4 != 0 else 0
+            else:
+                ea += 4
+
+        if ui: idc.jumpto(output)

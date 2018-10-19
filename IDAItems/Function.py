@@ -285,6 +285,8 @@ class Function:
         # specify  whether this is an arm or thumb function
         if self.isThumb():
             disasm += ".thumb_func\n"
+        else:
+            disasm += ".arm\n"
 
         # spefiy function comment, if available
         # put // for function comment in each line

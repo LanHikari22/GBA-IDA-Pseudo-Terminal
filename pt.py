@@ -1,16 +1,17 @@
 import idaapi
-idaapi.require("miscTools")
-idaapi.require("disasmTools")
-idaapi.require("fixTools")
-idaapi.require("SrchTools.srchTools")
+idaapi.require('DisasmTools.Terminal')
+idaapi.require('FixTools.Terminal')
+idaapi.require("MiscTools.Terminal")
+idaapi.require("SrchTools.Terminal")
 idaapi.require("TerminalModule")
 idaapi.require("Definitions.Environment")
 from Definitions import Environment
-import miscTools
-import disasmTools
 import TerminalModule
-import fixTools
-from SrchTools import srchTools
+
+import DisasmTools.Terminal
+import MiscTools.Terminal
+import FixTools.Terminal
+import SrchTools.Terminal
 import time
 
 class PseudoTerminal(TerminalModule.TerminalModule, object):
@@ -31,14 +32,14 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         self.registerCommand(self.clrenv, "clrenv ()")
 
         # __init__ of modules should set up things similarly to pt
-        self.misc = miscTools.misc()
-        self.registerModule(self.misc)
-        self.dis = disasmTools.dis()
+        self.dis = DisasmTools.Terminal.DisTerminal()
+        self.srch = SrchTools.Terminal.SrchTerminal()
+        self.fix = FixTools.Terminal.fix()
+        self.misc = MiscTools.Terminal.MiscTerminal()
         self.registerModule(self.dis)
-        self.fix = fixTools.fix()
-        self.registerModule(self.fix)
-        self.srch = srchTools.srch()
         self.registerModule(self.srch)
+        self.registerModule(self.fix)
+        self.registerModule(self.misc)
 
 
 

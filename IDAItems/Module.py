@@ -13,7 +13,7 @@ idaapi.require('Definitions.Architecture')
 idaapi.require('IDAItems.GameFile')
 idaapi.require('IDAItems.Function')
 
-from BinarySearcher import BinarySearcher
+from SrchTools.BinarySearcher import BinarySearcher
 from Definitions.Architecture import ROM_SEG
 from IDAItems.GameFile import GameFile
 from IDAItems import Function
