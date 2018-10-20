@@ -2,6 +2,8 @@
 # utilities for searching for things in the IDB, as well as in binaries (and against the IDB) go here!
 import idaapi
 import idautils
+import idc
+import idc_bc695
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
@@ -56,12 +58,23 @@ def listUpdatedSymbols(elfPath):
     """
     output = []
     symTable = getSymTable(elfPath)
-    for ea, name in idautils.Names():
+
+    # compute all names in RAM and ROM
+    names = []
+    for seg_ea in idautils.Segments():
+        # skip BIOS
+        if seg_ea == 0:
+            continue
+        for head in idautils.Heads(seg_ea, idc_bc695.SegEnd(seg_ea)):
+            if idc.Name(head):
+                names.append((head, idc.Name(head)))
+
+    for ea, name in names:
         eaInSymTable = ea in symTable
         if eaInSymTable or ea+1 in symTable:
 
             # increment by 1 for thumb function symbols
-            if ea+1 in symTable:
+            if ea+1 in symTable and idc.isCode(idc.GetFlags(ea)):
                 name_ea = ea+1
             else:
                 name_ea = ea

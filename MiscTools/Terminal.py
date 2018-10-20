@@ -3,11 +3,15 @@ idaapi.require('TerminalModule')
 idaapi.require('MiscTools.miscTools')
 idaapi.require('MiscTools.Operations')
 idaapi.require('MiscTools.MemAccessReader')
+idaapi.require('MiscTools.Hotkeys')
+idaapi.require('MiscTools.TimeProfiler')
 
 import TerminalModule
 from MiscTools import miscTools
 import MiscTools.Operations
 import MiscTools.MemAccessReader
+import MiscTools.Hotkeys
+import MiscTools.TimeProfiler
 
 class MiscTerminal(TerminalModule.TerminalModule, object):
     """
@@ -27,6 +31,8 @@ class MiscTerminal(TerminalModule.TerminalModule, object):
         self.registerModule(self.memar)
 
         # register commands
+        self.setHotKeys = MiscTools.Hotkeys.setHotkeys
+        self.runTimeTests = MiscTools.TimeProfiler.runTimeTests
         self.ea2gf = miscTools.ea2gf
         self.sizeTillName = miscTools.sizeTillName
         self.getLZ77CompressedSize = miscTools.getLZ77CompressedSize
@@ -35,7 +41,10 @@ class MiscTerminal(TerminalModule.TerminalModule, object):
         self.plcv = miscTools.plcv
         self.nlrepl = miscTools.nlrepl
         self.rngmkd = miscTools.rngmkd
+
         self.registerCommand(self.gendocs, "gendocs(terminalModule)")
+        self.registerCommand(self.setHotKeys, "setHotKeys()")
+        self.registerCommand(self.runTimeTests, "runTimeTests(n=10)")
         self.registerCommand(self.ea2gf, "ea2gf(ea)")
         self.registerCommand(self.sizeTillName, "sizeTillName(ea, blockSize=1)")
         self.registerCommand(self.getLZ77CompressedSize, "getLZ77CompressedSize(compressed_ea)")

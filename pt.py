@@ -22,26 +22,28 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
         # the module itelf also has a summary format, this is created by TerminalModule
         super(PseudoTerminal, self).__init__(fmt)
 
-        # each command in the module is added to the help and fmt records
-        self.registerCommand(self.help, "help (command/module)")
-        self.registerCommand(self.fmt, "fmt (command/module)")
-        self.registerCommand(self.echo, "echo (msg)")
-        self.registerCommand(self.time, "time (func, func_args)")
-        self.registerCommand(self.clear, "clear (n=32)")
-        self.registerCommand(self.env, "env (key=Val)")
-        self.registerCommand(self.clrenv, "clrenv ()")
+        try:
+            # each command in the module is added to the help and fmt records
+            self.registerCommand(self.help, "help (command/module)")
+            self.registerCommand(self.fmt, "fmt (command/module)")
+            self.registerCommand(self.echo, "echo (msg)")
+            self.registerCommand(self.time, "time (func, func_args)")
+            self.registerCommand(self.clear, "clear (n=32)")
+            self.registerCommand(self.env, "env (key=Val)")
+            self.registerCommand(self.clrenv, "clrenv ()")
 
-        # __init__ of modules should set up things similarly to pt
-        self.dis = DisasmTools.Terminal.DisTerminal()
-        self.srch = SrchTools.Terminal.SrchTerminal()
-        self.fix = FixTools.Terminal.fix()
-        self.misc = MiscTools.Terminal.MiscTerminal()
-        self.registerModule(self.dis)
-        self.registerModule(self.srch)
-        self.registerModule(self.fix)
-        self.registerModule(self.misc)
-
-
+            # __init__ of modules should set up things similarly to pt
+            self.dis = DisasmTools.Terminal.DisTerminal()
+            self.srch = SrchTools.Terminal.SrchTerminal()
+            self.fix = FixTools.Terminal.fix()
+            self.misc = MiscTools.Terminal.MiscTerminal()
+            self.registerModule(self.dis)
+            self.registerModule(self.srch)
+            self.registerModule(self.fix)
+            self.registerModule(self.misc)
+            self._initialized = True
+        except Exception:
+            self._initialized = False
 
     @staticmethod
     def echo(msg):
@@ -107,4 +109,7 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
 
 if __name__ == '__main__':
     pt = PseudoTerminal()
-    pt.echo("PseudoTerminal, ready for combat!")
+    if pt._initialized:
+        pt.echo("PseudoTerminal, ready for combat!")
+    else:
+        print('Initalized Environment to Default')

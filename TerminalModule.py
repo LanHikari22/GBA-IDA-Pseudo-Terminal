@@ -44,6 +44,12 @@ class TerminalModule:
         self.registerHelp(self, self.help(self) + fmt + '\n')
         self.commands.append(cmdf)
 
+    def cmds(self):
+        output = []
+        for cmd in self.commands:
+            output.append(self.fmt(cmd))
+        return output
+
     @staticmethod
     def registerHelp(key, help):
         """

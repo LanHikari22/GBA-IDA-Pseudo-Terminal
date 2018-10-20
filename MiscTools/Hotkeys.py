@@ -1,13 +1,15 @@
 import idaapi
 
+import MiscTools.miscTools
+
 idaapi.require("MiscTools.Operations")
 
-from pt import pt
-
 import idc
-from idc_bc695 import AddHotkey, here
+from idc_bc695 import AddHotkey
+from idc import here
 import MiscTools.Operations as ops
 import SrchTools.nextTools as next
+from Definitions.Environment import env
 
 compiled_functions = {}
 
@@ -23,19 +25,15 @@ def ida_run_python_function(func_name):
 
 
 def actionZ():
-    # print('Action Z')
-    return next.unkptr(here())
-
-    # print(f(here()))
+    print("work?")
+    # return next.unkptr(here())
 
 
 def actionX():
-    # print('Action X')
     return ops.tillName(here(), ops.delShiftedContent)
 
 
 def actionA():
-    # print('Action A')
     print(ops.arrTillName(here()))
 
 
@@ -52,8 +50,8 @@ def actionF():
     """
     Shift+F - Display current file
     """
-    gfs = pt.get('gameFiles')
-    gf = pt.misc.ea2gf(here())
+    gfs = env['gameFiles']
+    gf = MiscTools.miscTools.ea2gf(here())
     fileAddr = here() - gfs[gf][0]
     size = gfs[gf][1] - gfs[gf][0]
     # get last name found
@@ -68,10 +66,18 @@ def actionI():
     Import files for quick access to functions not registered within the pseudoterminal
     :return:
     """
-    ops =
+    pass
+
+def actionT():
+    """
+    Test Action. Scratchpad, you can erase this.
+    :return:
+    """
+    import MiscTools.TimeProfiler
+    MiscTools.TimeProfiler.runTimeTests()
 
 # Quick Action commands
-def defineHotkeys():
+def setHotkeys():
     """
     This compiles the hot key functions and maps them so they can be used with shortcuts in IDA
     """
@@ -82,3 +88,9 @@ def defineHotkeys():
 
     # Perm-mapped
     AddHotkey("Shift+F", ida_run_python_function("actionF"))
+    AddHotkey("Shift+T", ida_run_python_function("actionT"))
+
+    print('Hotkeys set!')
+
+if __name__ == '__main__':
+    setHotkeys()

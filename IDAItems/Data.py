@@ -899,12 +899,44 @@ class Data:
         :return: filtered disasembly
         """
         # type: (str) -> str
+        # TODO [OPTIMIZE]: Perform the lowering in a more systematic fashion. There are only a handful of keywords to
+        # lower. (This can take up to 278 us)
+
+        # if there is a comment, just ignore its text
+        if '//' in disasm:
+            searchDisasm = disasm[:disasm.index('//')].rstrip()
+        else:
+            searchDisasm = disasm
+
+        # always lower the first word (mnemoic)
+        if ' ' in searchDisasm:
+            firstSpaceIdx = searchDisasm.index(' ')
+            mnemoic = searchDisasm[: firstSpaceIdx]
+            disasm = disasm.replace(mnemoic, mnemoic.lower(), 1)
+            searchDisasm = searchDisasm[firstSpaceIdx+1:]
+            # if there are only two keywords (one space), only the mnemoic is lowered.
+            # Those are BL xxxx, B xxxx, nop, etc.
+            if searchDisasm.count(' ') == 1:
+                return disasm
+
+        words = list(filter(None, re.split('[ \t+=#,()\[\]{}]', searchDisasm)))
+        for word in words:
+            if ( (word[0] == 'R' and word[1:].isalnum()) or
+                     (word == 'PC' or word == 'LR' or word == 'SP') or
+                     (word.startswith('0x'))):
+                disasm = disasm.replace(word, word.lower(), 1)
+
+        return disasm
+
+    def _lowerCodeOLD(self, disasm):
         words = list(filter(None, re.split('[ \t//()]', disasm)))
 
         for word in words:
-            # special case, do not filter pool comments/names
-            if word[0] == '=':
+            # filter specific conditions
+            if (word[0] == '=' or  # special case, do not filter pool comments/names
+                    (word[0] == '#' and word[1:].isalnum())): # filter immediate opcode text
                 continue
+
             # lower the word in the disasm if it's not a global symbol
             if idc.get_name_ea(self.ea, word) == idaapi.BADADDR:
                 disasm = disasm.replace(word, word.lower(), 1)
@@ -917,6 +949,7 @@ class Data:
         #         if name in disasm or name.lower() in disasm:
         #             disasm = disasm.replace(name.lower(), name, 1)
         return disasm
+
 
     def _convertAlignDisasm(self, disasm):
         # type: (str) -> str
