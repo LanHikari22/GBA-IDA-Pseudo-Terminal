@@ -1,8 +1,10 @@
 import idaapi
+idaapi.require('MiscTools.Operations')
+idaapi.require('MiscTools.miscTools')
+import MiscTools.miscTools as mt
+from MiscTools import TimeProfiler
+from IDAItems import Data
 
-import MiscTools.miscTools
-
-idaapi.require("MiscTools.Operations")
 
 import idc
 from idc_bc695 import AddHotkey
@@ -51,7 +53,7 @@ def actionF():
     Shift+F - Display current file
     """
     gfs = env['gameFiles']
-    gf = MiscTools.miscTools.ea2gf(here())
+    gf = mt.ea2gf(here())
     fileAddr = here() - gfs[gf][0]
     size = gfs[gf][1] - gfs[gf][0]
     # get last name found
@@ -66,15 +68,25 @@ def actionI():
     Import files for quick access to functions not registered within the pseudoterminal
     :return:
     """
-    pass
+    status = True
+    status = status and readStructMacro("dev/dis/bn6f/include/structs/Toolkit.inc")
+    status = status and readStructMacro("dev/dis/bn6f/include/structs/GameState.inc")
+    status = status and readStructMacro("dev/dis/bn6f/include/structs/BattleObject.inc")
+    print(status)
 
 def actionT():
     """
     Test Action. Scratchpad, you can erase this.
     :return:
     """
-    import MiscTools.TimeProfiler
-    MiscTools.TimeProfiler.runTimeTests()
+    # for ea in range(0x3005B00, 0x3007FFF):
+    #     if idc.Name(ea):
+    #         print('.equ %s, 0x%07x' % (idc.Name(ea), ea))
+
+    # print(mt.getLabelsWithSpaceDirective(0x2009450, 0x203a9b0))
+    # print(mt.getLabelsWithSpaceDirective(0x203C4A0, 0x203F7E4))
+    TimeProfiler.runTimeTests()
+
 
 # Quick Action commands
 def setHotkeys():
@@ -88,9 +100,52 @@ def setHotkeys():
 
     # Perm-mapped
     AddHotkey("Shift+F", ida_run_python_function("actionF"))
+    AddHotkey("Shift+I", ida_run_python_function("actionI"))
     AddHotkey("Shift+T", ida_run_python_function("actionT"))
 
     print('Hotkeys set!')
 
+def readStructMacro(path):
+    """
+    Parses struct macros and updates a corresponding enum with their values
+    :param path: the path to the file containing the macros
+    :return:
+    """
+    # parse macro file
+    macroFile = open(path)
+    members = []
+    structName = ''
+    for line in macroFile.readlines():
+        if line.startswith('\struct_entry'):
+            if ', ' in line:
+                name = line[line.index(')')+1 : line.index(',')]
+                size = line[line.index(', ')+2 :].rstrip()
+                if '//' in size:
+                    size = size[:size.index('//')].rstrip()
+                if size.startswith('0x'):
+                    size = int(size, 16)
+                else:
+                    size = int(size)
+            else:
+                name = line[line.index(')')+1 :].rstrip()
+                if '//' in name:
+                    name = name[:name.index('//')].rstrip()
+                size = 0
+            members.append((name, size))
+        if line.startswith('def_struct_offsets'):
+            structName = line[line.index(', ')+2:].rstrip()
+
+    print('parsed struct "' + structName + '"')
+    # read into enum
+    enumId = idc.get_enum(structName)
+    if enumId == idaapi.BADADDR:
+        enumId = idc.add_enum(idaapi.BADADDR, structName, idaapi.decflag())
+    # add members in
+    offset = 0x00
+    for member, size in members:
+        idc.add_enum_member(enumId, structName + member, offset, idaapi.BADADDR)
+        offset += size
+
+    return True
 if __name__ == '__main__':
     setHotkeys()

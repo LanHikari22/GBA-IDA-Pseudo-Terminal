@@ -29,14 +29,12 @@ class Function:
         :raises: InvalidFunctionException if func_ea does not live within a function, or the function is not defined.
         :param func_ea: long: Effective Address of function to manipulate
         """
-        # If the current address is a function process it
+        # If the current address is a function, process it
         if idc.get_func_flags(func_ea) != -1:
 
             self.func = idaapi.get_func(func_ea)
             self.func_ea = self.func.startEA
 
-            # TODO: these shouldn't be unsupported. detect each chunk as its own function? fix func_ea
-            # function chunks can give invalid behavior when definind functions!
             if self.func.tails:
                 raise (FunctionException("%07X: Function Chunks are not supported" % func_ea))
         else:
@@ -296,10 +294,6 @@ class Function:
         if self.getComment():
             comment += '// ' + self.getComment().replace('\n', '\n// ') + '\n'
         disasm += comment
-
-        # if available, provide .equs for all stack variables
-        # TODO: stack variables no longer supported
-        # disasm += self.getStackVarDisasm()
 
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):

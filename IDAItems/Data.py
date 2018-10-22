@@ -263,7 +263,7 @@ class Data:
         """
         flags = idc.GetFlags(self.ea)
         if idc.isStruct(flags):
-            disasm = self._getStructDisasm(self.ea)
+            disasm = self._getStructDisasm()
             # disasm = "INVALID"
         elif idc.isAlign(flags):
             disasm = idc.GetDisasm(self.ea)
@@ -297,11 +297,16 @@ class Data:
                     # TODO [INVALID] arm-none-eabi doesn't recognize \xXX? \x seems to become a byte.
                     disasm += '\\x%02X' % content[i]
         elif idc.isData(flags):
-            disasm = self._getDataDisasm(self.ea)
+            disasm = self._getDataDisasm()
         else:
             disasm = idc.GetDisasm(self.ea)
             disasm = self._filterComments(disasm)
             disasm = disasm.replace('  ', ' ')
+
+        # parse force command
+        if '<force>' in self.getComment():
+            comment = self.getComment()
+            disasm = comment[comment.index('<force> ') + len('<force> '):]
         return disasm
 
     def getDisasm(self):
@@ -313,7 +318,7 @@ class Data:
         if idc.isData(flags) or idc.isUnknown(flags):
             disasm = self._convertData(disasm)
         elif idc.isCode(flags):
-            disasm = self._convertCode(self.ea, disasm)
+            disasm = self._convertCode(disasm)
             # make code small case
             disasm = self._lowerCode(disasm)
         elif idc.isAlign(flags):
@@ -342,7 +347,13 @@ class Data:
         inlineComment = ''
         # include the data item's comment
         comment = self.getComment()
-        if self.getComment():
+        if comment:
+            # TODO: parsing the force out of the comment, but replacing with original
+            if '<force>' in comment:
+                origDisasm = idc.GetDisasm(self.ea)
+                if ';' in origDisasm:
+                    origDisasm = origDisasm[:origDisasm.index(';')]
+                comment = comment[:comment.index('<force>')] +  '<il><force> ' + origDisasm
             if '<il>' in comment:
                 splitIdx = comment.index('<il>')
                 inlineComment = comment[splitIdx+len('<il>'):]
@@ -405,7 +416,7 @@ class Data:
     def isUnknown(self):
         return idc.isUnknown(idc.GetFlags(self.ea))
 
-    def _convertCode(self, ea, disasm):
+    def _convertCode(self, disasm):
         """
         modifies code data items so that they're compatible with arm-none-eabi-gcc
         Some comment tags are reserved for conversion actions:
@@ -414,12 +425,12 @@ class Data:
         :param disasm: (str) disasm to transform
         :return: (str) converted disasm
         """
-        flags = idc.GetFlags(ea)
+        flags = idc.GetFlags(self.ea)
         output = disasm  # Default case, no modifications
         if idc.isCode(flags):
 
             # some instructions take no operands, like NOP
-            instName = idc.GetMnem(ea)
+            instName = idc.GetMnem(self.ea)
 
             # if the instruction is THUMB, it cannot have an 'S' in it... (except for branches)
             # the BIC instruction is not a branch, account for that
@@ -477,7 +488,7 @@ class Data:
         return disasm.replace(';', ' //', disasm.count(';'))
         pass
 
-    def _getArrDisasm(self, ea, elemsPerLine, dataType):
+    def _getArrDisasm(self, elemsPerLine, dataType):
         # type: (int, int, str) -> str
         """
 
@@ -536,24 +547,24 @@ class Data:
 
         return disasm
 
-    def _getDataDisasm(self, ea, elemsPerLine=-1):
+    def _getDataDisasm(self):
         """
         You cannot get array data using getdisasm. The disassembly has to be extracted differently.
         This identifies the data in question, and gets its disassembly
-        :param ea: the effective address of the item to get the disassembly of
-        :param elemsPerLine: if 0, maximum (8) will be used. if <0, it'll be parsed from the database. otherwise, it's n.
         :return: the disasssembly of the data item
         """
         # First, do the easy cases that just work with GetDisasm
-        flags = idc.GetFlags(ea)
-        if idc.is_data(flags) and (idc.is_byte(flags) and idc.get_item_size(ea) == 1
-                                   or idc.is_word(flags) and idc.get_item_size(ea) == 2
-                                   or idc.is_dword(flags) and idc.get_item_size(ea) == 4):
+        flags = idc.GetFlags(self.ea)
+        # TODO: change this so it accounts for arrays also
+        if idc.is_enum0(flags):
+            return self._filterComments(idc.GetDisasm(self.ea))
+        if idc.is_data(flags) and (idc.is_byte(flags) and idc.get_item_size(self.ea) == 1
+                                   or idc.is_word(flags) and idc.get_item_size(self.ea) == 2
+                                   or idc.is_dword(flags) and idc.get_item_size(self.ea) == 4):
             # normal case where an int is not misread as a reference
-            data = Data(ea)
-            content = data.getContent()
-            if data.getXRefsFrom()[1] and self.isPointer(content):
-                disasm = idc.GetDisasm(ea)
+            content = self.getContent()
+            if self.getXRefsFrom()[1] and self.isPointer(content):
+                disasm = idc.GetDisasm(self.ea)
                 contentData = Data(content)
                 # If it's a struct member, replace it with its hex, but keep the information
                 if '.' in disasm and (';' not in disasm or '.' in disasm[:disasm.index(';')]):
@@ -561,36 +572,33 @@ class Data:
                                                     disasm[len('DCD '):])
 
 
-            elif ida_bytes.is_manual(self._getFlags(), 0):
+            elif ida_bytes.is_manual(flags, 0):
                 # Manual forms put in IDA, just grab it. (This is for cases where computations are applied to data)
-                disasm = idc.GetDisasm(ea)
+                disasm = idc.GetDisasm(self.ea)
             else:
                 # build the disassembly: this is for none-pointer symbols found in IDA (ex: word_0)
                 if idc.is_byte(flags): op = 'DCB'
                 elif idc.is_word(flags): op = 'DCW'
                 else: op = 'DCD'
                 disasm = op + ' ' + '0x%X' % content
+
             return self._filterComments(disasm)
         else:  # The weird case... an array. I don't know why it's weird. IDA doesn't like it!
             # It is assumed this is an array, but the type is unknown. Imply type based on disasm of first line!
             # analysis on the array is based on the very first line
-            firstLineSplitDisasm = list(filter(None, re.split('[ ,]', idc.GetDisasm(ea))))
+            disasm = idc.GetDisasm(self.ea)
+            if ';' in disasm:
+                disasm = disasm[:disasm.index(';')]
+            firstLineSplitDisasm = list(filter(None, re.split('[ ,]', disasm)))
             dataType = firstLineSplitDisasm[0]
 
-            # determine the number of elements per line, if 0 (default) is specified, then it's parsed instead
-            if elemsPerLine < 0:
-                commentWords = len(list(filter(None, re.split('[ ,]', self.getComment()))))
-                # -1 to not include type, ex: DCB, DCD... But comments can exist on the first line too!
-                elemsPerLine = len(firstLineSplitDisasm) - 1 - commentWords
-            elif elemsPerLine == 0:  # when specifying 0, show MAX_ELEMENTS elements
-                elemsPerLine = 8
-
-            return self._getArrDisasm(ea, elemsPerLine, dataType)
+            return self._getArrDisasm(len(firstLineSplitDisasm) - 1, dataType)
 
 
-    def _getStructDisasm(self, ea):
+
+    def _getStructDisasm(self):
         # type: (int) -> str
-        return self._getArrDisasm(ea, 8, 'DCB')
+        return self._getArrDisasm(8, 'DCB')
 
 
     def _filterComments(self, disasm):
@@ -618,7 +626,8 @@ class Data:
             output = self.isPointer(content)
         return output
 
-    def isPointer(self, ea):
+    @staticmethod
+    def isPointer(ea):
         """
         an ea is likely a pointer if it has a possible value for physical addressing.
         :param ea: linear address of the data item
@@ -707,138 +716,6 @@ class Data:
             #                                                    pool_ea, self.ea, shift, cmt)
         return output
 
-
-    def _OLDgetPoolDisasm(self):
-        # type: () -> str
-        """
-        Converts pool to linker compatible version. If the instruction is not a pool
-        instruction
-
-        :param ea: ea of inst
-        :return: disassembly with the correct LDR/STR [PC, ...] format
-        :raise: DataException if conversion is impossible
-        """
-
-        disasm = idc.GetDisasm(self.ea)
-        if ';' in disasm:
-            disasm = disasm[:disasm.index(';')]
-
-        # must be a load or store
-        if "LDR" not in disasm:
-            raise(DataException('attempt to convert pool in non-pool inst'))
-
-        # retrieve the instrution and register used
-        words = list(filter(None, re.split('[ \t]', disasm)))
-
-        inst = words[0]
-        no_inst_disasm = disasm[len(inst):].lstrip()
-        reg = words[1]
-
-        # it's not a pool instruction if it ends with ']' (ldr r0, [r1] vs ldr r0, =beep)
-        if disasm[-1] == ']':
-            raise(DataException('attempt to convert pool in non-pool inst'))
-
-        # determine whether it's arm or thumb
-        arm = self.getSize() == 4
-
-        # there must be xrefs, LDR/STR must not be register relative
-        xrefsFrom = self.getXRefsFrom()
-
-        if not len(xrefsFrom[1]):
-            raise(DataException('%07X: attempt to convert pool in non-pool inst' % self.ea))
-
-        # sometimes, xrefsFrom point to both content_ra and pool_ea. order is inconsistent
-        pool_ea = -1
-
-        # we're using the LDR Rx, =... format
-        if '=' in words[2]:
-            # assert '=' is the first char. it makes no sense otherwise
-            if words[2][0] != '=':
-                raise (DataException('%07X: found = in a weird place in PC-relative load' % self.ea))
-            # grab the value in the =. That content must be consistent with pool_ea's content
-            poolName = words[2][1:]
-            # if there's a comment, don't include it
-            if ';' in poolName:
-                poolName = poolName[:poolName.index(';')]
-            # filter out potential ()s
-            if poolName[0] == '(':
-                poolName = poolName[1:-1]
-            # filter out index
-            if '+' in poolName:
-                poolName = poolName[:poolName.index('+')]
-            # if there's only one xref, no inconsistency. simply grab it
-            if len(xrefsFrom[1]) == 1:
-                pool_ea = xrefsFrom[1][0]
-            else:
-                for xref in xrefsFrom[1]:
-                    # there are always two options, the content, or the pool_ea. Make sure we're not
-                    # grabbing content
-                    if idc.Name(xref) and idc.Name(xref) != poolName:
-                        pool_ea = xref
-                        break
-                if pool_ea == -1:
-                    # check if the pool is pointing to an index of itself (array)
-                    if Data(xrefsFrom[1][0]).ea == Data(xrefsFrom[1][1]).ea:
-                        # the smaller one would be the pool location, as in the start of the array. (unless identical)
-                        pool_ea = min(xrefsFrom[1][0], xrefsFrom[1][1])
-
-        # assert that a pool_ea was found
-        if pool_ea == -1:
-            raise (DataException('%07X: no pool_ea was found' % self.ea))
-
-        # confirm that the content being loaded is an int. can't load anything else to a register!
-        poolData = Data(pool_ea)
-
-        # every pool reference must have a name
-        if not poolData.getName():
-            raise (DataException("%07X: pool_ea %07X does not have a name" % (self.ea, pool_ea)))
-
-        content = poolData.getContent()
-
-        # if the pointer derefernced in the pool is an array, it's the first element being dereferenced
-        if type(content) == list:
-            content = content[0]
-
-        if type(content) != int and type(content) != long:
-            raise(DataException("%07X: attempt to load non-int to register" % pool_ea))
-
-        # write the actual pool value being loaded for readability
-        contentData = Data(content)
-        if contentData.isPointer(contentData.ea):
-            # figure out unsync between xref of pool and content data... that's the index +!
-            # depending on the data format of the value in the db, it may have no xrefs...
-            if poolData.getXRefsFrom()[1]:
-                contentXref = poolData.getXRefsFrom()[1][0]
-                if contentXref - contentData.ea > 0:
-                    index = "+%d" % (contentXref - contentData.ea)
-                elif contentXref - contentData.ea  < 0:
-                    index = "-%d" % (contentData.ea - contentXref)
-                else:
-                    index = ''
-            else:
-                index = ''
-
-            cmt = "=%s%s" % (contentData.getName(), index)
-        else:
-            cmt = "=0x%X" % content
-
-        # the amount of shift to apply depends on the instruction mode
-        if arm:
-            shift = 8
-        else:
-            # this is more complicated since it can be word unaligned
-            if (pool_ea - self.ea - 4) % 4 != 0:
-                # to achieve word alignment, we round down to the last word aligned value
-                shift = 2
-            else:
-                # normal case, PC is 2 instructions ahead
-                shift = 4
-        # TODO: tabs or pads for instructions?
-        # return "%s %s [PC, #0x%07X-0x%07X-%d] // %s" % (inst, reg,
-        #                                                 pool_ea, self.ea, shift, cmt)
-        return "%s %s %s // %s " % (inst, reg, poolData.getName(), cmt)
-
-
     def _isFunctionPointer(self, firstLineSplitDisasm):
         """
         Identifies the construct 'DCD <funcName>' as a function pointer entry!
@@ -902,9 +779,19 @@ class Data:
         # TODO [OPTIMIZE]: Perform the lowering in a more systematic fashion. There are only a handful of keywords to
         # lower. (This can take up to 278 us)
 
-        # if there is a comment, just ignore its text
-        if '//' in disasm:
-            searchDisasm = disasm[:disasm.index('//')].rstrip()
+        # trivial cases where the whole statement is lower:
+        # PUSH/POP, SVC, BX, STMIA, LDMIA
+        if (disasm[0] == 'P'
+                or disasm.startswith('BX')
+                or disasm.startswith('SVC')
+                or disasm.startswith('LDM')
+                or disasm.startswith('STM')
+        ):
+            return disasm.lower()
+
+
+        if disasm[0] == '.' and '// ' in disasm:
+            searchDisasm = disasm[disasm.index('// ')+3:] # for fake instructions commented out
         else:
             searchDisasm = disasm
 
@@ -913,17 +800,18 @@ class Data:
             firstSpaceIdx = searchDisasm.index(' ')
             mnemoic = searchDisasm[: firstSpaceIdx]
             disasm = disasm.replace(mnemoic, mnemoic.lower(), 1)
-            searchDisasm = searchDisasm[firstSpaceIdx+1:]
             # if there are only two keywords (one space), only the mnemoic is lowered.
             # Those are BL xxxx, B xxxx, nop, etc.
-            if searchDisasm.count(' ') == 1:
+            if (mnemoic[0] == 'B' and mnemoic != 'BIC') or mnemoic == 'SVC':
                 return disasm
+            searchDisasm = searchDisasm[firstSpaceIdx+1:]
 
-        words = list(filter(None, re.split('[ \t+=#,()\[\]{}]', searchDisasm)))
+        words = list(filter(None, re.split('[ \t+=\#,()\[\]]', searchDisasm)))
         for word in words:
-            if ( (word[0] == 'R' and word[1:].isalnum()) or
-                     (word == 'PC' or word == 'LR' or word == 'SP') or
-                     (word.startswith('0x'))):
+            if ( (word[0] == 'R' and word[1:].isalnum())
+                or (word == 'PC' or word == 'LR' or word == 'SP')
+                or (word.startswith('0x'))
+            ):
                 disasm = disasm.replace(word, word.lower(), 1)
 
         return disasm
@@ -941,13 +829,6 @@ class Data:
             if idc.get_name_ea(self.ea, word) == idaapi.BADADDR:
                 disasm = disasm.replace(word, word.lower(), 1)
 
-        # an exceptional case is symbols not globally defined... like stack symbols
-        # TODO: stack variables not supported
-        # if IDAItems.Function.hasStackVars(self.ea) and '#' in disasm:
-        #     stackVars = IDAItems.Function.getStackVars(self.ea)
-        #     for name, off in stackVars:
-        #         if name in disasm or name.lower() in disasm:
-        #             disasm = disasm.replace(name.lower(), name, 1)
         return disasm
 
 

@@ -246,3 +246,20 @@ def rngmkd(start_ea, end_ea):
         idc.MakeDword(ea)
         ea += 4
 
+def getLabelsWithSpaceDirective(start, end):
+    """
+    This prints the labels, with a .space directive specifying the size till next name
+    :param start: start address to look fo rnames in
+    :param end: end address, exclusive
+    :return: report of all labels with .space
+    """
+    output = ''
+    names = []
+    for ea in range(start, end):
+        if idc.Name(ea):
+            names.append((ea, idc.Name(ea)))
+    names.append((end, 'end'))
+    for i in range(len(names)):
+        if i != len(names)-1:
+            output += 'ds %s // 0x%07x\n\t.space %d\n' % (names[i][1], names[i][0], names[i+1][0] - names[i][0])
+    return output
