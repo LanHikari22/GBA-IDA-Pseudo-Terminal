@@ -3,14 +3,14 @@ idaapi.require('MiscTools.Operations')
 idaapi.require('MiscTools.miscTools')
 import MiscTools.miscTools as mt
 from MiscTools import TimeProfiler
-from IDAItems import Data
-
+from IDAItems import Data, Function
 
 import idc
 from idc_bc695 import AddHotkey
 from idc import here
 import MiscTools.Operations as ops
 import SrchTools.nextTools as next
+import FixTools.fixTools as fix
 from Definitions.Environment import env
 
 compiled_functions = {}
@@ -27,24 +27,51 @@ def ida_run_python_function(func_name):
 
 
 def actionZ():
-    print("work?")
+    pass
+    # return next.ret(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1])
+    # return next.byDataElement(here(), lambda ea: ('POP' in idc.GetDisasm(ea) and 'PC' in idc.GetDisasm(ea))
+    #                                              or 'PC, LR' in idc.GetDisasm(ea),
+    #                           end_ea=env['gameFiles'][mt.ea2gf(here())][1])
+    # fix.fixThumbPushPopFuncRanges(Function.Function(here()-4).func_ea, here())
     # return next.unkptr(here())
-
-
-def actionX():
     return ops.tillName(here(), ops.delShiftedContent)
 
 
+def actionX():
+    # Mainly for removing things, or fixing things.
+    # return ops.tillName(here(), ops.delShiftedContent)
+    fix.collapseUnknowns(*env['gameFiles'][mt.ea2gf(here())])
+
 def actionA():
-    print(ops.arrTillName(here()))
+    # print(ops.arrTillName(here()))
+    print(ops.arrTillRef(here()))
+
 
 
 def actionS(ea=None):
-    # print('Action S')
+    # Mainly for search-type actions or analysis
     if not ea: ea = here()
-    ops.tillName(here(), lambda ea: idc.SetRegEx(ea, "T", 0, idc.SR_user))
+
+    output = next.unkptr(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1])
+    # output = next.red(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1])
+    if output == idaapi.BADADDR:
+        print(False)
+
+    # global v, cur
+    # idaapi.jumpto(v[cur])
+    # print('%07X [%d/%d]' % (v[cur], cur, len(v)))
+    # cur += 1
+
+    # ops.tillName(here(), lambda ea: idc.SetRegEx(ea, "T", 0, idc.SR_user))
     # pt.misc.getLZ77CompressedSize(pointerOf(here()) - (1<<31))
 
+def actionQ():
+    print(ops.arrTillName(here()))
+
+def actionW():
+    # fix.fixThumbPushPopFuncRanges(Function.Function(here() - 4).func_ea, here())
+    fix.makeThumb(*env['gameFiles'][mt.ea2gf(here())])
+    pass
 
 # Convenient Actions
 #
@@ -97,6 +124,8 @@ def setHotkeys():
     AddHotkey("Shift+X", ida_run_python_function("actionX"))
     AddHotkey("Shift+A", ida_run_python_function("actionA"))
     AddHotkey("Shift+S", ida_run_python_function("actionS"))
+    AddHotkey("Shift+Q", ida_run_python_function("actionQ"))
+    AddHotkey("Shift+W", ida_run_python_function("actionW"))
 
     # Perm-mapped
     AddHotkey("Shift+F", ida_run_python_function("actionF"))

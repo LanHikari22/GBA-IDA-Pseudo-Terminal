@@ -3,6 +3,7 @@ import idc
 
 from DisasmTools import Terminal
 from IDAItems import Data
+import SrchTools.nextTools as next
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
@@ -142,13 +143,6 @@ def delShiftedContentRange(start_ea, end_ea):
             print('%07X: del content %s' % (ea, disasm))
         ea += d.getSize()
 
-
-def unkRange(start_ea, end_ea):
-    ea = start_ea
-    for ea in range(start_ea, end_ea):
-        idc.del_items(ea, 1)
-
-
 def tillName(ea, f):
     d = Data.Data(ea)
     while True:
@@ -168,12 +162,20 @@ def unkTillName(ea):
         if d.getName(): break
     return d.ea
 
-
 def arrTillName(ea):
     if not Data.Data(ea).isPointer(ea):
         return False
     name_ea = unkTillName(ea)
     idc.make_array(ea, name_ea - ea)
+    return True
+
+def arrTillRef(ea):
+    # TODO [BUG]: sometimes swallows names?
+    if not Data.Data(ea).isPointer(ea):
+        return False
+    ref_ea = next.byDataElement(ea, lambda ea: idc.Name(ea) or Data.Data(ea).hasPointer(), ui=False)
+    delRange(ea, ref_ea)
+    idc.make_array(ea, ref_ea - ea)
     return True
 
 

@@ -55,7 +55,9 @@ class SrchTerminal(TerminalModule.TerminalModule, object):
             self.unkret = SrchTools.nextTools.unkret
             self.deadfunc = SrchTools.nextTools.deadfunc
             self.fakered = SrchTools.nextTools.fakered
+            self.ref = SrchTools.nextTools.ref
             self.unkptr = SrchTools.nextTools.unkptr
+            self.byDataElement = SrchTools.nextTools.byDataElement
 
             self.registerCommand(self.arm, "arm(search_ea, ui=True)")
             self.registerCommand(self.ascii, "ascii(search_ea, ui=True)")
@@ -69,4 +71,6 @@ class SrchTerminal(TerminalModule.TerminalModule, object):
             self.registerCommand(self.unkret, "unkret(search_ea, ui=True, hexOut=True)")
             self.registerCommand(self.deadfunc, "deadfunc(ea, ui=True, hexOut=True)")
             self.registerCommand(self.fakered, "fakered(ea, ui=True, hexOut=True)")
-            self.registerCommand(self.unkptr, "unkptr(self, ea, end_ea=0x8800000, ui=True, hexOut=True)")
+            self.registerCommand(self.ref, "ref(ea, end_ea=None, ui=True, hexOut=True)")
+            self.registerCommand(self.unkptr, "unkptr(self, ea, end_ea=None, ui=True, hexOut=True)")
+            self.registerCommand(self.byDataElement, "byDataElement(ea, condFunc, end_ea=None, ui=True)")

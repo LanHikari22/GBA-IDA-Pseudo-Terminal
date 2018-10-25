@@ -63,6 +63,16 @@ def ascii(ea, ui=True):
     if ui: idaapi.jumpto(output)
     return '%07X' % output
 
+def _getFakeInstructions():
+    """
+    a list of detected instructions with different encoding using arm-none-eabi gcc
+    :return: list of opcodes
+    """
+    # TODO: super clumsy, replace this with logical detection. (I don't want to because, incidentally this is a
+    # TODO: good way of detecting false code)
+    return [0x0, 0x1, 0x2, 0x3, 0x4, 0x09, 0xA, 0x19, 0x1B, 0x22, 0x1C00, 0x1C09, 0x1C12, 0x1C1B, 0x1F9B, 0x4425,
+            0xB85D, 0xB88B, 0xB8A3]
+
 def fakeinst(ea, ui=True):
     # type: (int) -> str
     """
@@ -85,19 +95,7 @@ def fakeinst(ea, ui=True):
         ea += d.getSize()
     # trigger the gui to jump to the hypothetical next fake instruction
     if ui: idaapi.jumpto(ea)
-    return '%07X' % output
-
-@staticmethod
-def _getFakeInstructions():
-    """
-    a list of detected instructions with different encoding using arm-none-eabi gcc
-    :return: list of opcodes
-    """
-    # TODO: super clumsy, replace this with logical detection. (I don't want to because, incidentally this is a
-    # TODO: good way of detecting false code)
-    return [0x0, 0x1, 0x2, 0x3, 0x4, 0x09, 0xA, 0x19, 0x1B, 0x22, 0x1C00, 0x1C09, 0x1C12, 0x1C1B, 0x1F9B, 0x4425,
-            0xB85D, 0xB88B, 0xB8A3]
-
+    return output
 
 def name(ea, ui=True, hexOut=True, reverse=False):
     """
@@ -192,13 +190,12 @@ def bin(ea, ui=True):
     idaapi.jumpto(start_ea)
     return '0x%07X, 0x%07X, 0x%X' % (start_ea, end_ea, size)
 
-def red(ea, end_ea=None, ui=True, hexOut=True):
+def red(ea, end_ea=None, ui=True):
     """
     Looks for code items outside function items. The first detected is returned
     :param ea: ea to start searching from
     :param end_ea: the last address of the search range, or default if None
     :param ui: if True, jump to address automatically
-    :param hexOut: output hex formatted ea range instead
     :return: ea of next name
     """
     # don't count this item
@@ -212,7 +209,6 @@ def red(ea, end_ea=None, ui=True, hexOut=True):
             break
         ea += d.getSize()
     if ui: idaapi.jumpto(ea)
-    if hexOut: return '%07X' % output
     return output
 
 def immref(ea, ui=True):
@@ -435,17 +431,40 @@ def fakered(ea, end_ea=None, ui=True, hexOut=True):
     if hexOut: return '(%07X, %07X)' % (start_ea, end_red_ea)
     return (start_ea, end_red_ea)
 
-def unkptr(ea, end_ea=0x08800000, rom=True, ui=True, hexOut=True):
+def ref(ea, end_ea=None, ui=True, hexOut=True):
     """
-
     :param ea: ea to start searching from
     :param ui: if True, jump to address automatically
-    :param end_ea: the last address of the search range. If not specified, default is used.
+    :param end_ea: the last address of the search range. If -1, end of segment is used.
     :param hexOut: output hex formatted ea range instead
+    :return: linear address of next reference in data
+    """
+    output = idaapi.BADADDR
+    if not end_ea: end_ea = idc.SegEnd(ea)
+    # advance an element so multiple calls to this function can chain
+    d = Data.Data(ea)
+    ea += d.getSize()
+
+    while ea < end_ea:
+        if d.hasPointer():
+            output = ea
+            break
+        ea += d.getSize()
+        d = Data.Data(ea)
+
+    return output
+
+def unkptr(ea, end_ea=None, rom=True, ui=True, hexOut=True):
+    """
+    Finds the next occurance of data that can suspected to be a pointer but not defined as such
+    :param ea: ea to start searching from
+    :param ui: if True, jump to address automatically
+    :param end_ea: the last address of the search range. If -1, end of segment is used
     :return: range of ea of next unknown/unexplored pointer
     """
 
     output = idaapi.BADADDR
+    if not end_ea: end_ea = idc.SegEnd(ea)
 
     # advance an element so multiple calls to this function can chain
     d = Data.Data(ea)
@@ -474,7 +493,11 @@ def unkptr(ea, end_ea=0x08800000, rom=True, ui=True, hexOut=True):
         if (inRange):
             if not d.isCode() and not d.getXRefsFrom()[1]:
                 output = ea
-                if hexOut: print('%07X: %07X <%s>' % (ea, dword, Data.Data(dword).getName()))
+                if hexOut:
+                    dwordData = Data.Data(dword)
+                    offset = dword - dwordData.ea
+                    offset = ('+0x%X' % offset) if offset else ''
+                    print('%07X: %07X <%s%s>' % (ea, dword, dwordData.getName(), offset))
                 break
         if d.getXRefsFrom()[1]:
             ea += d.getSize()
@@ -483,3 +506,29 @@ def unkptr(ea, end_ea=0x08800000, rom=True, ui=True, hexOut=True):
             ea += 4
 
     if ui: idc.jumpto(output)
+    return output
+
+def byDataElement(ea, condFunc, end_ea=None, ui=True):
+    """
+
+    :param ea: ea to start searching from
+    :param condFunc: the conditions to be evaluated on current ea, must take one argument ea
+    :param end_ea: ea to stop searching at, if nothing is found
+    :param ui: jump to output ea
+    :return: ea of found element fitting the conditions described by condFunc
+    """
+    output = idaapi.BADADDR
+    if not end_ea: end_ea = idc.SegEnd(ea)
+
+    # advance an element so multiple calls to this function can chain
+    d = Data.Data(ea)
+    d = Data.Data(d.ea + d.getSize())
+
+    while d.ea < end_ea:
+        if condFunc(d.ea):
+            output = d.ea
+            break
+        d = Data.Data(d.ea + d.getSize())
+
+    if ui: idc.jumpto(output)
+    return output

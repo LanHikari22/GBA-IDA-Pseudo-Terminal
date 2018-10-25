@@ -105,3 +105,15 @@ class Insn:
                       (i, op.specval))
             else:
                 print('op %d: unknown (%d)' % (i, type))
+
+    def getPushPopFlags(self):
+        # type: () -> int
+        """
+        Parses Push/Pop Register flags and returns them, or returns False if not a PushPop instruction
+        :return: flags for each register packaged in an int
+        """
+        if ((self.itype == idaapi.ARM_push or self.itype == idaapi.ARM_pop)
+            and self.ops[0].type == ida_ua.o_idpspec1
+            ):
+            return self.ops[0].specval
+        return False

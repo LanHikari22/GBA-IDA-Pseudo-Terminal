@@ -1,17 +1,16 @@
 # @file fixTools
 # utilities for automatic fixing go here!
 import idaapi
-import idautils
-
-from SrchTools import srchTools, nextTools
-
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
-idaapi.require("TerminalModule")
 
+from idaapi import ida_ua
+import idautils
 import idc
-from IDAItems import Function, Data, InstDecoder
-import TerminalModule
+import SrchTools.nextTools as next
+import SrchTools.srchTools as srch
+import MiscTools.Operations as ops
+from IDAItems import Function, Data, InstDecoder, Instruction
 
 def remFuncChunks():
     """
@@ -98,15 +97,14 @@ def makeThumb(start_ea, end_ea):
     :param ea: the address to start from
     :return: False if no instruction found, else True
     """
-    srchNext = srchTools.nextTools.next()
-    ea = int(srchNext.arm(start_ea, ui=False), 16)
+    ea = int(next.arm(start_ea, ui=False), 16)
     foundARM = False
     while ea <= end_ea:
         foundARM = True
         # fix arm to thumb
         print("%07X: Changing to THUMB mode" % ea)
         idc.SetRegEx(ea, "T", 1, idc.SR_user)
-        ea = int(srchNext.arm(ea, ui=False), 16)
+        ea = int(next.arm(ea, ui=False), 16)
     if foundARM:
         print("Successfully changed ARM modes to THUMB!")
         return True
@@ -186,7 +184,6 @@ def makeUnkPushFuncs(start_ea, end_ea):
     :param end_ea: end of the range to fix
     :return:
     """
-    next = nextTools.next()
     ea, pop_ea = next.deadfunc(start_ea, end_ea, ui=False, hexOut=False)
     while ea < end_ea:
         d = Data.Data(ea)
@@ -216,20 +213,19 @@ def fixFunctionRanges(start_ea, end_ea):
             if Function.isFunction(i) or Data.Data(i).getXRefsTo()[1]:
                 stop_ea = i
                 break
-        next_tools = nextTools.next()
         # figure out the first return, and return type of this function. That should be consistent
-        ret_ea = next_tools.ret(f.func_ea, ui=False, hexOut=False)
+        ret_ea = next.ret(f.func_ea, ui=False, hexOut=False)
         retType = InstDecoder.Inst(ret_ea).fields['magic']
         # modify the function range to include all returns
         if Function.isFunction(ret_ea):
-            ret_ea = next_tools.unkret(f.func_ea, ui=False, hexOut=False)
+            ret_ea = next.unkret(f.func_ea, ui=False, hexOut=False)
             # this ret_ea is not within the function, if the return type is different
             if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
                 continue
         while f.func_ea < ret_ea < stop_ea:
             # detected that the function range is invalid, fix range
             print('ret %07X' % ret_ea)
-            ret_ea = next_tools.unkret(ret_ea, ui=False, hexOut=False)
+            ret_ea = next.unkret(ret_ea, ui=False, hexOut=False)
             # this ret_ea is not within the function, if the return type is different
             if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
                 break
@@ -267,3 +263,107 @@ def removeRedCode(start_ea, end_ea):
         print("%07X: del red code (%07X, %07X)" % (redStart_ea, redStart_ea, redEnd_ea))
         idc.del_items(redStart_ea, 0, redEnd_ea - redStart_ea)
         redStart_ea = redEnd_ea = srchNext.red(redEnd_ea, end_ea, ui=False, hexOut=False)
+
+def collapseUnknowns(start_ea, end_ea, verbose=True):
+    """
+    Changes all initial unknown heads into byte arrays until the next defined reference or next label
+    :param state_ea: range start for collapsing
+    :param end_ea: range end for collapsing
+    :param verbose: if True, print all changes
+    :return: Fix status
+    """
+    ea = start_ea
+    while ea < end_ea:
+        ea = next.byDataElement(ea, lambda ea: idc.isUnknown(idc.GetFlags(ea)), ui=False)
+        if verbose:
+            print('%07X: make array till reference/name' % ea)
+        ops.arrTillRef(ea)
+    return True
+
+# ---
+def extendThumbFuncToLastPop(func_ea, lastInsn_ea, verbose=True):
+    """
+    Looks for another POP {..., PC}. Stops at the start of a new function, or at the start of
+    labeled data. Otherwise, it makes sure the code is disassembled, and is thumb, and it extends the
+    range of the function to the found POP {..., PC}.
+    A corner case not accounted by this algorithm, is if the data is in the middle of code, but
+    is jumped over.
+    :param func_ea: addr to function to fix
+    :param lastInsn_ea: address to the last instruction within the function, as registered in the IDB.
+    :return: whether a fix ocurred or not
+    """
+    ea = lastPop_ea = lastInsn_ea
+    while not idc.Name(ea) or not idc.isData(idc.GetFlags(ea)):
+        if idc.GetReg(ea, 'T') == 0:
+            idc.SetRegEx(ea, 'T', 1, idc.SR_user)
+
+        # if idc.isData(idc.GetFlags(ea)):
+        #     # if not thumb, make thumb
+        #     idc.del_items(ea, 0, 2)
+        #     idc.MakeCode(ea)
+
+        if Instruction.isInsn(ea):
+            insn = Instruction.Insn(ea)
+            # update last POP {..., PC} detected
+            if insn.itype == idaapi.ARM_pop and ((insn.getPushPopFlags() & (1<<15)) != 0):
+                lastPop_ea = ea
+            # stop condition, assuming no  PUSH {..., LR} in current function
+            if insn.itype == idaapi.ARM_push and ((insn.getPushPopFlags() & (1<<14)) != 0):
+                break
+
+        ea += idaapi.get_item_size(ea)
+
+    # extend last function to last pop detected
+    if lastPop_ea != lastInsn_ea:
+        if verbose:
+            print('%07X: End -> %07X <%s>' % (func_ea, lastPop_ea, Data.Data(lastPop_ea).getDisasm()))
+        idc.SetFunctionEnd(func_ea, lastPop_ea+2)
+        return True
+    return False
+
+
+def fixThumbPushPopFuncRanges(start_ea, end_ea, verbose=True):
+    """
+    This is heusterical, it fixes problems that occur in the IDA anlysis.
+    This fix only applies to thumb functions started with PUSH {LR}.
+    Two cases are considered valid:
+    - A function is cut off at a BL. Change its range to the nearest POP {PC}
+    - A function is cut off at a BX, and a CPU mode change error occurs.
+    - A function is cut off at a POP {PC}, but there is no PUSH {LR} before teh occurrance of the next POP{PC}
+    The fixing process involves turning data into code, if needed, and changing to thumb mode until the next POP.
+    :param start_ea: start of the range to look for broken functions in
+    :param end_ea: end of the range to look for functions in
+    :param verbose: prints info messages
+    :return: fix status. False if any problems occur
+    """
+    ea = start_ea
+    while ea < end_ea:
+        if Function.isFunction(ea):
+            func = Function.Function(ea)
+            if func.isThumb():
+                # ensure it's a PUSH/POP function
+                firstInsn = Instruction.Insn(func.func_ea)
+                # print(idc.GetDisasm(firstInsn.ea))
+                if (firstInsn.itype == idaapi.ARM_push
+                    and (firstInsn.getPushPopFlags() & (1<<14)) != 0
+                ):
+                    # check the last instruction. make sure it's a POP {..., PC}, BL, or BX.
+                    lastInsn_ea = func.func_ea + func.getSize(withPool=False)
+                    if idc.get_item_size(lastInsn_ea-4) == 4:
+                        lastInsn_ea -= 4 # in case of BL, which is of size 4
+                    else:
+                        lastInsn_ea -= 2
+                    lastInsn = Instruction.Insn(lastInsn_ea)
+                    # print(idc.GetDisasm(lastInsn.ea))
+                    if ( (lastInsn.itype == idaapi.ARM_pop and (lastInsn.getPushPopFlags() & (1<<15)) != 0)
+                            or lastInsn.itype == idaapi.ARM_bl
+                            or lastInsn.itype == idaapi.ARM_bx
+                        ):
+                        # print('OK')
+                        extendThumbFuncToLastPop(func.func_ea,
+                                                 lastInsn_ea,
+                                                 verbose)
+
+            ea += func.getSize(withPool=True)
+        else:
+            ea += Data.Data(ea).getSize()

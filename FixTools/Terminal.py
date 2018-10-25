@@ -7,6 +7,7 @@ from SrchTools import srchTools, nextTools
 
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
+idaapi.require("FixTools.fixTools")
 idaapi.require("TerminalModule")
 
 from FixTools import fixTools
@@ -38,14 +39,14 @@ class fix(TerminalModule.TerminalModule, object):
         self.fixFunctionRanges = fixTools.fixFunctionRanges
         self.removeFakeRedCode = fixTools.removeFakeRedCode
         self.removeRedCode = fixTools.removeRedCode
-        self.registerCommand(self.remFuncChunks, "remFuncChunks ()")
-        self.registerCommand(self.replNameParen, "replNameParen ()")
-        self.registerCommand(self.markRedundantInsts, "markRedundantInsts (start_ea, end_ea)")
-        self.registerCommand(self.makeThumb, "makeThumb (start_ea, end_ea)")
-        self.registerCommand(self.changeASCII, "changeASCII (start_ea, end_ea)")
-        self.registerCommand(self.removeText, "removeText (start_ea, end_ea)")
-        self.registerCommand(self.removeStackVarUsages, "removeStackVarUsages (start_ea, end_ea)")
-        self.registerCommand(self.makeUnkPushFuncs, "makeUnkPushFuncs (start_ea, end_ea)")
-        self.registerCommand(self.fixFunctionRanges, "fixFunctionRanges (start_ea, end_ea)")
-        self.registerCommand(self.removeFakeRedCode, "removeFakeRedCode (start_ea, end_ea)")
-        self.registerCommand(self.removeRedCode, "removeRedCode (start_ea, end_ea)")
+        self.registerCommand(self.remFuncChunks, "remFuncChunks()")
+        self.registerCommand(self.replNameParen, "replNameParen()")
+        self.registerCommand(self.markRedundantInsts, "markRedundantInsts(start_ea, end_ea)")
+        self.registerCommand(self.makeThumb, "makeThumb(start_ea, end_ea)")
+        self.registerCommand(self.changeASCII, "changeASCII(start_ea, end_ea)")
+        self.registerCommand(self.removeText, "removeText(start_ea, end_ea)")
+        self.registerCommand(self.removeStackVarUsages, "removeStackVarUsages(start_ea, end_ea)")
+        self.registerCommand(self.makeUnkPushFuncs, "makeUnkPushFuncs(start_ea, end_ea)")
+        self.registerCommand(self.fixFunctionRanges, "fixFunctionRanges(start_ea, end_ea)")
+        self.registerCommand(self.removeFakeRedCode, "removeFakeRedCode(start_ea, end_ea)")
+        self.registerCommand(self.removeRedCode, "removeRedCode(start_ea, end_ea)")
