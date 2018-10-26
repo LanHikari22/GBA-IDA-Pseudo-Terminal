@@ -3,14 +3,12 @@ idaapi.require('TerminalModule')
 idaapi.require('MiscTools.miscTools')
 idaapi.require('MiscTools.Operations')
 idaapi.require('MiscTools.MemAccessReader')
-idaapi.require('MiscTools.Hotkeys')
 idaapi.require('MiscTools.TimeProfiler')
 
 import TerminalModule
 from MiscTools import miscTools
 import MiscTools.Operations
 import MiscTools.MemAccessReader
-import MiscTools.Hotkeys
 import MiscTools.TimeProfiler
 
 class MiscTerminal(TerminalModule.TerminalModule, object):
@@ -31,7 +29,6 @@ class MiscTerminal(TerminalModule.TerminalModule, object):
         self.registerModule(self.memar)
 
         # register commands
-        self.setHotKeys = MiscTools.Hotkeys.setHotkeys
         self.runTimeTests = MiscTools.TimeProfiler.runTimeTests
         self.ea2gf = miscTools.ea2gf
         self.sizeTillName = miscTools.sizeTillName
@@ -43,7 +40,6 @@ class MiscTerminal(TerminalModule.TerminalModule, object):
         self.rngmkd = miscTools.rngmkd
 
         self.registerCommand(self.gendocs, "gendocs(terminalModule)")
-        self.registerCommand(self.setHotKeys, "setHotKeys()")
         self.registerCommand(self.runTimeTests, "runTimeTests(n=10)")
         self.registerCommand(self.ea2gf, "ea2gf(ea)")
         self.registerCommand(self.sizeTillName, "sizeTillName(ea, blockSize=1)")

@@ -23,19 +23,37 @@ def old():
 
 
 def time_us(func, *args, **kwargs):
+    """
+    Times a function in the microseconds by executing it a thousand times.
+    This is because time.time() is only accurate to the millisecond.
+    :param func: the function to run
+    :param args: any arguments to the function
+    :param kwargs: any keyworded arguments to the function
+    :return: a tuple of execution time in us and the output of the function
+    """
     stopwatch_us = int(round(time.time() * 1000))
     for i in range(1000):
-        output = func(*args, **kwargs)
+        func(*args, **kwargs)
     stopwatch_us = int(round(time.time() * 1000)) - stopwatch_us
-    return stopwatch_us
+    return (stopwatch_us, func(*args, **kwargs))
 
+def avgTime_us(numSamples, func, *args, **kwargs):
+    """
+    Runs time_us numSamples times, and averages the results
+    :param numSamples: the number of times to run the tests and get an average
+    :param func: the function to run
+    :param args: any arguments to the function
+    :param kwargs: any keyworded arguments to the function
+    :return: a tuple of the average time for execution in us and the output of the function
+    """
+    t = 0
+    for i in range(numSamples):
+        t += time_us(func, *args, **kwargs)[0]
+    t /= numSamples
+    return (t, func(*args, **kwargs))
 
 def runTimeTest(n, name, func, *args, **kwargs):
-    t = 0
-    for i in range(n):
-        t += time_us(func, *args, **kwargs)
-    t /= n
-    print("%s: %d us" % (name, t))
+    print("%s: %d us" % (name, avgTime_us(n, func, *args, **kwargs)[0]))
 
 
 def runTimeTests(n=10):

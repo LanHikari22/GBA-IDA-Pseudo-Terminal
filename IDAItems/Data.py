@@ -29,9 +29,9 @@ class Data:
         # the item.
         size = 0
         ranLoop = False
-        # TODO: [SLOW] bottleneck algorithm (especially for big arrays, accessed at index 0x100 or so)
+        # TODO [SLOW]: bottleneck algorithm (especially for big arrays, accessed at index 0x100+)
         while idc.get_item_size(ea) > size:
-            ranLoop = True
+            if not ranLoop: ranLoop = True
             size = idc.get_item_size(ea)
             ea -= 1
         if ranLoop:

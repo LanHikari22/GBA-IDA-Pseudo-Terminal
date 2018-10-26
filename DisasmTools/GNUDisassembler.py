@@ -34,13 +34,15 @@ class GNUDisassembler:
             file = file[file.rindex('\\') + 1:]
         return file
 
-    def push(self):
+    def push(self, startFile=''):
         """
         Automatcally generates disassembly .s files and .inc headers for assembly files specified
         in self.gameFiles, to self.projPath. Header files are put to the same relative path specified in
         self.gameFiles, except in the folder specified by self.incPath.
         """
         for file in sorted(self.gameFiles.keys(), key=self.gameFiles.__getitem__):
+            if startFile and self.gameFiles[file][0] < self.gameFiles[startFile][0]:
+                continue
             # filename = self._getBaseFilename(file)
             if file.endswith('.s'):
                 filename = file[:file.rindex('.')]
