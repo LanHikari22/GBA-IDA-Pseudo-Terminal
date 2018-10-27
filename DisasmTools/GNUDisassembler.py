@@ -112,7 +112,7 @@ class GNUDisassembler:
             if  Function.isFunction(ea):
                 f = Function.Function(ea)
                 if debug: print("%07X: disass function %s @ %07X" % (ea, f.getName(), f.func_ea))
-                disasm += f.getFormattedDisasm() + "\n\n"
+                disasm += f.getFormattedDisasm(start_ea, end_ea) + "\n\n"
                 ea = ea + f.getSize(withPool=True)
             else:
                 d = Data.Data(ea)

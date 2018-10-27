@@ -13,7 +13,6 @@ from IDAItems import Data
 
 idaapi.require("IDAItems.Data")
 
-
 class FunctionException(Exception):
     def __init__(self, s):
         super(Exception, self).__init__(s)
@@ -268,23 +267,37 @@ class Function:
             ea += data.getSize()
         return output
 
-    def getFormattedDisasm(self):
+    def getFormattedDisasm(self, start_ea=False, end_ea=False):
         # type: () -> str
         """
         Gets the disassembly of the function by creating data elements of all
         its items, including its pool.
+        :param start_ea: file range start, enables formatting to use a global/local macro
+        :param end_ea: file range end, enables formatting to use a global/local macro
         :return:
         """
         ea = self.func_ea
 
         # specify start of function
-        disasm = '.func\n'
-
-        # specify  whether this is an arm or thumb function
-        if self.isThumb():
-            disasm += ".thumb_func\n"
+        # file range supplied, inform if thumb or arm function, local/global thumb via macros
+        isThumb = self.isThumb()
+        if end_ea:
+            disasm = ''
+            if isThumb:
+                if self.isGlobal(start_ea, end_ea):
+                    disasm += 'thumb_func_start %s\n' % (self.getName())
+                else:
+                    disasm += 'thumb_local_start\n' 
+            else:
+                    disasm += "arm_func_start %s\n" % (self.getName())
+        # no macros approach, give sufficient type to symbols
         else:
-            disasm += ".arm\n"
+            disasm = '.func\n'
+            # specify  whether this is an arm or thumb function
+            if isThumb:
+                disasm += ".thumb_func\n"
+            else:
+                disasm += ".arm\n"
 
         # spefiy function comment, if available
         # put // for function comment in each line
@@ -301,7 +314,14 @@ class Function:
             disasm += d.getFormattedDisasm() + "\n"
             # advance to next item
             ea = ea + d.getSize()
-        disasm += ".endfunc // %s" % self.getName()
+
+        if end_ea:
+            if isThumb:
+                disasm += "thumb_func_end %s" % self.getName()
+            else:
+                disasm += "arm_func_end %s" % self.getName()
+        else:
+            disasm += ".endfunc // %s" % self.getName()
 
         return disasm
 
@@ -361,8 +381,23 @@ class Function:
 
         return disasm
 
+    def isGlobal(self, start_ea, end_ea):
+        """
+        Determines whether there are uses of the function outside the specified range.
+        :param start_ea: start range of the hypothetical file this belongs to
+        :param end_ea: end range of the hypothetical file
+        :return: True if xrefsFrom outside the range exist
+        """
+        crefs, drefs = self.getXRefsTo()
+        xrefs = crefs + drefs
+        for xref in xrefs:
+            if not (start_ea <= xref < end_ea):
+                return True # global
+        return False # local
+
 def isFunction(ea):
     return idc.get_func_flags(ea) != -1
+
 
 def hasStackVars(ea):
     """
@@ -372,6 +407,7 @@ def hasStackVars(ea):
     id = idc.GetFrame(ea)
     firstMember = idc.GetFirstMember(id)
     return firstMember != idaapi.BADADDR and firstMember != -1
+
 
 def getStackVars(ea, base=-1):
     # type: (int, int) -> list[(str, int)]
