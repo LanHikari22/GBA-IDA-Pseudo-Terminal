@@ -262,7 +262,11 @@ class Data:
         :return: the disassembly
         """
         flags = idc.GetFlags(self.ea)
-        if idc.isStruct(flags):
+        if idc.isCode(flags):
+            disasm = idc.GetDisasm(self.ea)
+            disasm = self._filterComments(disasm)
+            disasm = disasm.replace('  ', ' ')
+        elif idc.isStruct(flags):
             disasm = self._getStructDisasm()
             # disasm = "INVALID"
         elif idc.isAlign(flags):
@@ -451,6 +455,12 @@ class Data:
             # if the instruction is a pool instruction, the format should be changed
             poolDisasm = self._getPoolDisasm()
             if poolDisasm: output = poolDisasm
+
+            # convert ADD Rx, Ry, #0 to a nicer form MOV Rx, Ry
+            if instName == 'ADD' and output.endswith(', #0') and output.count(',') > 1:
+                insn = Instruction.Insn(self.ea)
+                if insn.ops[0].reg <= 7 and insn.ops[1].reg <= 7:
+                    output = output.replace(instName, 'MOV', 1)[:output.rindex(',')]
 
             # if the instruction is an adc, replace it with a short
             if "ADR " in instName:

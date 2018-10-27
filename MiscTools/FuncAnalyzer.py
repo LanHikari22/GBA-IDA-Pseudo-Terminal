@@ -3,6 +3,18 @@ import idc
 
 from IDAItems import Function, Instruction
 
+def traceRegisterUsages(func_ea, reg, writeIdx):
+    """
+    Runs through the function and traces all accesses to a register with a particular writeIdx.
+    The writeIdx with the register forms the current local variable in that register.
+    :param func_ea: effective address of function to analyze
+    :param reg: the register to trace, 0 to 15
+    :param writeIdx: the counts of writes to this register before being traced. If 0, it will be traced
+    as an input register to the function. If 1, it will have to be written to once before being traced.
+    And so on.
+    :return: list of EAs of register usages/reads.
+    """
+    raise(NotImplemented())
 
 def guessFuncSig(func_ea):
     # type: (int) -> (list[str], list[str])
@@ -86,5 +98,3 @@ def analyzeFuncCalls(func_ea):
     :return:
     """
     raise(NotImplemented())
-
-def traceRegisterUsages(func_ea, reg)

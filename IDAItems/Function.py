@@ -277,17 +277,26 @@ class Function:
         :return:
         """
         ea = self.func_ea
+        disasm = ''
+
+        # spefiy function comment, if available
+        # put // for function comment in each line
+        comment = ''
+        if self.getComment(repeatable=True):
+            comment += '// ' + self.getComment(repeatable=True).replace('\n', '\n// ') + '\n'
+        if self.getComment():
+            comment += '// ' + self.getComment().replace('\n', '\n// ') + '\n'
+        disasm += comment
 
         # specify start of function
         # file range supplied, inform if thumb or arm function, local/global thumb via macros
         isThumb = self.isThumb()
         if end_ea:
-            disasm = ''
             if isThumb:
                 if self.isGlobal(start_ea, end_ea):
                     disasm += 'thumb_func_start %s\n' % (self.getName())
                 else:
-                    disasm += 'thumb_local_start\n' 
+                    disasm += 'thumb_local_start\n'
             else:
                     disasm += "arm_func_start %s\n" % (self.getName())
         # no macros approach, give sufficient type to symbols
@@ -299,14 +308,6 @@ class Function:
             else:
                 disasm += ".arm\n"
 
-        # spefiy function comment, if available
-        # put // for function comment in each line
-        comment = ''
-        if self.getComment(repeatable=True):
-            comment += '// ' + self.getComment(repeatable=True).replace('\n', '\n// ') + '\n'
-        if self.getComment():
-            comment += '// ' + self.getComment().replace('\n', '\n// ') + '\n'
-        disasm += comment
 
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
