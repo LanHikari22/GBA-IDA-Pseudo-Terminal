@@ -9,6 +9,7 @@ import re
 import ida_bytes
 import idautils
 import idc
+import ida_ua
 import Instruction
 
 
@@ -423,8 +424,6 @@ class Data:
     def _convertCode(self, disasm):
         """
         modifies code data items so that they're compatible with arm-none-eabi-gcc
-        Some comment tags are reserved for conversion actions:
-            <mkdata>:  Converts the code to data, this is necessary when encountering redundant instructions.
         :param ea: (long) addr of disasm
         :param disasm: (str) disasm to transform
         :return: (str) converted disasm
@@ -456,10 +455,16 @@ class Data:
             poolDisasm = self._getPoolDisasm()
             if poolDisasm: output = poolDisasm
 
-            # convert ADD Rx, Ry, #0 to a nicer form MOV Rx, Ry
+            # convert MOV Rlow, Rlow to a meaner form LSL Rx, Ry, #0. Thanks anyway, IDA.
+            if instName == 'MOV' and output.count(',') == 1:
+                insn = Instruction.Insn(self.ea)
+                if insn.ops[1].type == ida_ua.o_reg and insn.ops[0].reg <= 7 and insn.ops[1].reg <= 7:
+                    output = output.replace(instName, 'LSL', 1) + ', #0'
+
+            # convert ADD Rlow, Rlow, #0 to a nicer form MOV Rlow, Rlow. This is what arm-none-eabi-as does.
             if instName == 'ADD' and output.endswith(', #0') and output.count(',') > 1:
                 insn = Instruction.Insn(self.ea)
-                if insn.ops[0].reg <= 7 and insn.ops[1].reg <= 7:
+                if insn.ops[1].type == ida_ua.o_reg and insn.ops[0].reg <= 7 and insn.ops[1].reg <= 7:
                     output = output.replace(instName, 'MOV', 1)[:output.rindex(',')]
 
             # if the instruction is an adc, replace it with a short
@@ -468,9 +473,10 @@ class Data:
                 output = self._convertData(output)
 
             # parse comment commands -- if it's a redundant instruction, it should have the <mkdata> tag in it
-            if "<mkdata>" in self.getComment():
-                output = "DCW 0x%X // %s" % (self.getContent(), output)
-                output = self._convertData(output)
+            # if "<mkdata>" in self.getComment():
+            #     output = "DCW 0x%X // %s" % (self.getContent(), output)
+            #     output = self._convertData(output)
+
 
         return output
 

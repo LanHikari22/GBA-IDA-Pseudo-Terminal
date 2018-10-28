@@ -91,6 +91,19 @@ def markRedundantInsts(start_ea, end_ea):
                 d.setComment(cmt)
         ea += d.getSize()
 
+def removeMkdata(start_ea, end_ea, verbose=True):
+    ea = start_ea
+    while ea < end_ea:
+        d = Data.Data(ea)
+        if d.isCode() and '<mkdata>' in d.getComment():
+            comment = d.getComment()
+            comment = comment.replace('<mkdata>', '', 1)
+            if verbose:
+                print('%07X: remove <mkdata> "%s" -> "%s"' % (ea, d.getComment(), comment))
+            d.setComment(comment)
+        ea += d.getSize()
+
+
 def makeThumb(start_ea, end_ea):
     """
     Changes all ARM within the specified range to THUMB

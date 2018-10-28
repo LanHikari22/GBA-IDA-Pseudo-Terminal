@@ -5,8 +5,8 @@ import idaapi
 idaapi.require("IDAItems.Data")
 idaapi.require("IDAItems.Function")
 import idc
+import ida_enum # for reading enums
 from IDAItems import Function, Data
-
 
 class GNUDisassembler:
     """
@@ -437,3 +437,53 @@ class GNUDisassembler:
                                                       gameFiles[file][1] - gameFiles[file][0])
         return output
 
+def readStructMacro(path):
+    """
+    Parses struct macros and updates a corresponding enum with their values
+    :param path: the path to the file containing the macros
+    :return:
+    """
+    # parse macro file
+    macroFile = open(path)
+    members = []
+    structName = ''
+    for line in macroFile.readlines():
+        if line.lstrip().startswith('\struct_entry'):
+            if ', ' in line:
+                name = line[line.index(')')+1 : line.index(',')]
+                size = line[line.index(', ')+2 :].rstrip()
+                if '//' in size:
+                    size = size[:size.index('//')].rstrip()
+                if size.startswith('0x'):
+                    size = int(size, 16)
+                else:
+                    size = int(size)
+            else:
+                name = line[line.index(')')+1 :].rstrip()
+                if '//' in name:
+                    name = name[:name.index('//')].rstrip()
+                size = 0
+            members.append((name, size))
+        if line.startswith('def_struct_offsets'):
+            structName = line[line.index(', ')+2:].rstrip()
+    print('parsed struct "' + structName + '"')
+
+    # read into enum
+    enumId = idc.get_enum(structName)
+    if enumId == idaapi.BADADDR:
+        enumId = idc.add_enum(idaapi.BADADDR, structName, idaapi.decflag())
+
+    # parse all enum members, needed to know what member to replace
+    offset = 0x00
+    for member, size in members:
+        enumMember = idc.get_enum_member(enumId, offset, 0, ida_enum.DEFMASK)
+        if enumMember == idaapi.BADADDR:
+            print("why???")
+            idc.add_enum_member(enumId, structName + member, offset, idaapi.BADADDR)
+        elif idc.get_enum_member_name(enumMember) != structName + member:
+            # update member name, if value already exists
+            print('\tupdate %s // 0x%X' % (structName + member, offset))
+            idc.set_enum_member_name(enumMember, structName + member)
+
+        offset += size
+    return True

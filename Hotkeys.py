@@ -1,16 +1,19 @@
 import idaapi
 idaapi.require('MiscTools.Operations')
 idaapi.require('MiscTools.miscTools')
+idaapi.require('DisasmTools.GNUDisassembler')
 import MiscTools.miscTools as mt
 import MiscTools.TimeProfiler as tp
 from IDAItems import Data, Function
 
 import idc
+import ida_enum
 from idc_bc695 import AddHotkey
 from idc import here
 import MiscTools.Operations as ops
 import SrchTools.nextTools as next
 import FixTools.fixTools as fix
+import DisasmTools.GNUDisassembler as dis
 from Definitions.Environment import env
 
 compiled_functions = {}
@@ -97,9 +100,9 @@ def actionI():
     """
 
     status = True
-    # status = status and readStructMacro("dev/dis/bn6f/include/structs/Toolkit.inc")
-    # status = status and readStructMacro("dev/dis/bn6f/include/structs/GameState.inc")
-    # status = status and readStructMacro("dev/dis/bn6f/include/structs/BattleObject.inc")
+    status = status and dis.readStructMacro("dev/dis/bn6f/include/structs/Toolkit.inc")
+    status = status and dis.readStructMacro("dev/dis/bn6f/include/structs/GameState.inc")
+    status = status and dis.readStructMacro("dev/dis/bn6f/include/structs/BattleObject.inc")
     print(status)
 
 def actionP():
@@ -123,6 +126,12 @@ def actionT():
 
     # print(mt.getLabelsWithSpaceDirective(0x2009450, 0x203a9b0))
     # print(mt.getLabelsWithSpaceDirective(0x203C4A0, 0x203F7E4))
+    enumId = idc.get_enum('oToolkit')
+    # enumMember = idc.get_enum_member_by_name('oToolkit_MainJumptableIndexPtr')
+    enumMember = idc.get_enum_member(enumId, 0x00, 1, ida_enum.DEFMASK)
+    # idc.set_enum_member_name(enumMember, 'oToolkit_MainJumptableIndexPtr')
+    print(hex(enumMember))
+
 
 # Quick Action commands
 def setHotkeys():
