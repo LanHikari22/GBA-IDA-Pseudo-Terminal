@@ -1,13 +1,19 @@
 import idaapi
+idaapi.require('IDAItems.Data')
+idaapi.require('IDAItems.Function')
+idaapi.require('IDAItems.Instruction')
 idaapi.require('MiscTools.Operations')
 idaapi.require('MiscTools.miscTools')
+idaapi.require('MiscTools.FuncAnalyzer')
 idaapi.require('DisasmTools.GNUDisassembler')
 import MiscTools.miscTools as mt
 import MiscTools.TimeProfiler as tp
-from IDAItems import Data, Function
+from MiscTools import FuncAnalyzer
+from IDAItems import Data, Function, Instruction
 
 import idc
 import ida_enum
+import ida_ua
 from idc_bc695 import AddHotkey
 from idc import here
 import MiscTools.Operations as ops
@@ -126,12 +132,81 @@ def actionT():
 
     # print(mt.getLabelsWithSpaceDirective(0x2009450, 0x203a9b0))
     # print(mt.getLabelsWithSpaceDirective(0x203C4A0, 0x203F7E4))
-    enumId = idc.get_enum('oToolkit')
-    # enumMember = idc.get_enum_member_by_name('oToolkit_MainJumptableIndexPtr')
-    enumMember = idc.get_enum_member(enumId, 0x00, 1, ida_enum.DEFMASK)
-    # idc.set_enum_member_name(enumMember, 'oToolkit_MainJumptableIndexPtr')
-    print(hex(enumMember))
 
+    ea = 0x8000000
+    while ea < 0x8800000:
+        if Function.isFunction(ea):
+            f = Function.Function(ea)
+            # markToolkit(f.func_ea)
+            markStructFromToolkit(f.func_ea, 0x3C, 'oGameState')
+            ea += f.getSize(withPool=True)
+        else:
+            ea += Data.Data(ea).getSize()
+
+
+def markToolkit(func_ea):
+    f = Function.Function(func_ea)
+    toolkitAccesses = FuncAnalyzer.traceRegVar(f.func_ea, f.func_ea + f.getSize(withPool=False), 10, 0)
+    for trace_ea in toolkitAccesses:
+        # lock into the register in question
+        insn = Instruction.Insn(trace_ea)
+        # print('trace', hex(trace_ea), insn.ops[0].reg, idc.GetDisasm(trace_ea))
+        if insn.isComputationalInsn():
+            regWrites = FuncAnalyzer.traceRegWrites(f.func_ea, f.func_ea + f.getSize(withPool=False),
+                                                    insn.ops[0].reg)
+            # TODO: traceRegWrites messes up insn
+            insn = Instruction.Insn(trace_ea)
+            # find the relevent register variable to trace
+            regVarIdx = FuncAnalyzer.getRegWriteIndex(trace_ea, regWrites)
+            insn = Instruction.Insn(trace_ea)
+            # trace all reads to this register variable in particular
+            # print('args', f.func_ea, f.func_ea + f.getSize(withPool=False),
+            #                                           insn.ops[0].reg, regVarIdx)
+            structAccesses = FuncAnalyzer.traceRegVar(f.func_ea, f.func_ea + f.getSize(withPool=False),
+                                                      insn.ops[0].reg, regVarIdx)
+            # those now will represent all registers R10 moved to, and thus, all of those accesses
+            # are accesses to the R10 struct
+            for access in structAccesses:
+                # print(hex(access), idc.GetDisasm(access))
+                # now mark with Toolkit enum
+                if Instruction.Insn(access).ops[1].type == ida_ua.o_displ:
+                    idc.op_enum(access, 1, idc.get_enum('oToolkit'), 0)
+    return True
+
+def markStructFromToolkit(func_ea, structOff, structName):
+    f = Function.Function(func_ea)
+    toolkitMovs = FuncAnalyzer.traceRegVar(f.func_ea, f.func_ea + f.getSize(withPool=False), 10, 0)
+    for trace_ea in toolkitMovs:
+        # lock into the register in question
+        insn = Instruction.Insn(trace_ea)
+        if insn.isComputationalInsn():
+            regWrites = FuncAnalyzer.traceRegWrites(f.func_ea, f.func_ea + f.getSize(withPool=False),
+                                                    insn.ops[0].reg)
+            # TODO: traceRegWrites messes up insn
+            insn = Instruction.Insn(trace_ea)
+            # find the relevent register variable to trace
+            regVarIdx = FuncAnalyzer.getRegWriteIndex(trace_ea, regWrites)
+            insn = Instruction.Insn(trace_ea)
+            # trace all reads to this register variable in particular
+            # print('args', f.func_ea, f.func_ea + f.getSize(withPool=False),
+            #                                           insn.ops[0].reg, regVarIdx)
+            toolkitAccesses = FuncAnalyzer.traceRegVar(f.func_ea, f.func_ea + f.getSize(withPool=False),
+                                                      insn.ops[0].reg, regVarIdx)
+            # those now will represent all registers R10 moved to, and thus, all of those accesses
+            # are accesses to the R10 struct
+            for access in toolkitAccesses:
+                # now mark with Toolkit enum
+                accessInsn = Instruction.Insn(access)
+                if accessInsn.ops[1].type == ida_ua.o_displ:
+                    if accessInsn.ops[1].addr == structOff:
+                        print(hex(access), idc.GetDisasm(access))
+
+                        structAcccesses = FuncAnalyzer.traceRegVar(f.func_ea, f.func_ea + f.getSize(withPool=False),
+                                                                   accessInsn.ops[0].reg, regVarIdx+1)
+                        for structAccess in structAcccesses:
+                            print(hex(structAccess), idc.GetDisasm(structAccess))
+                            idc.op_enum(structAccess, 1, idc.get_enum(structName), 0)
+    return True
 
 # Quick Action commands
 def setHotkeys():

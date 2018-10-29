@@ -1,20 +1,87 @@
 import idaapi
 import idc
+import ida_ua
 
 from IDAItems import Function, Instruction
 
-def traceRegisterUsages(func_ea, reg, writeIdx):
+def traceRegVar(start_ea, end_ea, reg, writeIdx):
     """
+    Takes a list of instructions as it is unsafe to reinitiate Instruction objects
     Runs through the function and traces all accesses to a register with a particular writeIdx.
     The writeIdx with the register forms the current local variable in that register.
-    :param func_ea: effective address of function to analyze
+    :param insts: instructions to analyze. list of IDAItems.Instruction objects
     :param reg: the register to trace, 0 to 15
     :param writeIdx: the counts of writes to this register before being traced. If 0, it will be traced
     as an input register to the function. If 1, it will have to be written to once before being traced.
     And so on.
-    :return: list of EAs of register usages/reads.
+    :return: list of EAs of register usages/reads or False if not in a valid function
     """
-    raise(NotImplemented())
+
+    writeCount = 0
+    accesses = []
+    ea = start_ea
+    while ea < end_ea:
+        insn = Instruction.Insn(ea)
+        # if the reg is written, its writeCount increases
+        if insn.isComputationalInsn():
+            # check read accesses, even if a write occurs to this register, its previous value can be read
+            for i in range(1, ida_ua.UA_MAXOP):
+                if (insn.ops[i].type in [ida_ua.o_reg, ida_ua.o_displ] # normal reg or ldr/str
+                    and writeCount == writeIdx
+                    and insn.ops[i].reg == reg
+                ):
+                    # print(hex(ea), idc.GetDisasm(ea))
+                    accesses.append(ea)
+                    break
+            if insn.ops[0].reg == reg:
+                writeCount += 1
+        else:
+            for i in range(0, ida_ua.UA_MAXOP):
+                if (insn.ops[i].type in [ida_ua.o_reg, ida_ua.o_displ] # normal reg or ldr/str
+                    and writeCount == writeIdx
+                    and insn.ops[i].reg == reg
+                ):
+                    accesses.append(ea)
+                    break
+        ea += idc.get_item_size(ea)
+    return accesses
+
+def traceRegWrites(start_ea, end_ea, reg):
+    """
+    Takes a list of instructions as it is unsafe to reinitiate Instruction objects
+    Specifies all the times the register has been written
+    :param insts: list of instructions to analyze.
+    :param reg: int. register number to check writes to
+    :return: list of eas of writes, or False if not in code
+    """
+
+    writes = []
+    ea = start_ea
+    while ea < end_ea:
+        insn = Instruction.Insn(ea)
+        # if the reg is written, its writeCount increases
+        if insn.isComputationalInsn():
+            if insn.ops[0].reg == reg:
+                writes.append(ea)
+        ea += idc.get_item_size(ea)
+    return writes
+
+def getRegWriteIndex(ip, writeTrace):
+    """
+    looks through instructions-relative addresses of when the register was written,
+    and computes its writeIndex.
+    If it was never written or ip is less than the range of writeTrace, then it's 0.
+    If ea is greater than the range, it's len(writeTraces)
+    :param ip: analysis-region relative address to compute writeIndex to register
+    :param writeTrace: a list of addresses in which the register has been written
+    :return: the write index of the register.
+    """
+    output = 0
+    for trace_ea in writeTrace:
+        if ip >= trace_ea:
+            output += 1
+    return output
+
 
 def guessFuncSig(func_ea):
     # type: (int) -> (list[str], list[str])

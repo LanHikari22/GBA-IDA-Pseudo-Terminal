@@ -36,12 +36,27 @@ class Insn:
 
     def isDataInsn(self):
         """
-        TODO: find bit clear, lsr
         :return: True if the instruction is computational. This includes MOV, ADD, MUL, LSL, etc.
         """
         type = self.insn.itype
-        return type in [idaapi.NN_mov, idaapi.NN_add, idaapi.NN_sub, idaapi.NN_mul, idaapi.NN_lsl, idaapi.NN_and,
-                        idaapi.NN_not, idaapi.NN_or, idaapi.NN_xor, idaapi.NN_cmp, idaapi.NN_test]
+        return type in [idaapi.ARM_mov, idaapi.ARM_add, idaapi.ARM_sub, idaapi.ARM_mul, idaapi.ARM_lsl,
+                        idaapi.ARM_lsl, idaapi.ARM_and, idaapi.ARM_not, idaapi.ARM_orr, idaapi.ARM_eor,
+                        idaapi.ARM_cmp, idaapi.ARM_tst, idaapi.ARM_bic]
+
+    def isComputationalInsn(self):
+        """
+        All instructions in which first op is a destination register
+        :return:
+        """
+        type = self.insn.itype
+        output = self.insn.ops[0].type == ida_ua.o_reg
+        output = (output and type in [idaapi.ARM_mov, idaapi.ARM_add, idaapi.ARM_sub, idaapi.ARM_mul, idaapi.ARM_lsl,
+                        idaapi.ARM_lsl, idaapi.ARM_and, idaapi.ARM_not, idaapi.ARM_orr, idaapi.ARM_eor,
+                        idaapi.ARM_bic,
+                        idaapi.ARM_str, idaapi.ARM_ldr, idaapi.ARM_ldrpc])
+        return output
+
+
 
     def isMemInsn(self):
         """
@@ -50,7 +65,7 @@ class Insn:
         :return: True if it's a memory instruction
         """
         type = self.insn.itype
-        return type in [idaapi.NN_str, idaapi.NN_cdq] # TODO: not sure what cdq is, this was determined experimentally to be LDR
+        return type in [idaapi.ARM_str, idaapi.ARM_ldr, idaapi.ARM_ldrpc]
 
     def isCtrlInsn(self):
         type = self.insn.itype

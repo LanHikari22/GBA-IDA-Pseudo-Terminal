@@ -294,11 +294,11 @@ class Function:
         if end_ea:
             if isThumb:
                 if self.isGlobal(start_ea, end_ea):
-                    disasm += 'thumb_func_start %s\n' % (self.getName())
+                    disasm += '\tthumb_func_start %s\n' % (self.getName())
                 else:
-                    disasm += 'thumb_local_start\n'
+                    disasm += '\tthumb_local_start\n'
             else:
-                    disasm += "arm_func_start %s\n" % (self.getName())
+                    disasm += "\tarm_func_start %s\n" % (self.getName())
         # no macros approach, give sufficient type to symbols
         else:
             disasm = '.func\n'
@@ -318,9 +318,9 @@ class Function:
 
         if end_ea:
             if isThumb:
-                disasm += "thumb_func_end %s" % self.getName()
+                disasm += "\tthumb_func_end %s" % self.getName()
             else:
-                disasm += "arm_func_end %s" % self.getName()
+                disasm += "\tarm_func_end %s" % self.getName()
         else:
             disasm += ".endfunc // %s" % self.getName()
 
