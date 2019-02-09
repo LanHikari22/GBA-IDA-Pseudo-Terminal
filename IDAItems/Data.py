@@ -480,7 +480,7 @@ class Data:
 
         return output
 
-    def _getFlags(self):
+    def getFlags(self):
         return idc.GetFlags(self.ea)
 
 

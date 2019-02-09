@@ -127,13 +127,13 @@ def makeThumb(start_ea, end_ea):
 
 def changeASCII(start_ea, end_ea):
     """
-    finds all ascii named data and changes it to bytes and removes its name
+    finds all ascii data which is not user named and changes it to bytes and removes its name
     """
     found = False
     ea = start_ea
     while ea < end_ea:
         d = Data.Data(ea)
-        if idc.isASCII(d._getFlags()):
+        if idc.isASCII(d.getFlags()):
             found = True
             print("%07X: Make ASCII -> Byte" % ea)
             idc.MakeByte(ea)
@@ -147,7 +147,7 @@ def changeASCII(start_ea, end_ea):
 
 def removeText(start_ea, end_ea):
     """
-    removes all ASCII text that is in text "..." format
+    removes all ASCII text within range
     :param start_ea: start of the range to remove
     :param end_ea: end of the range to remove
     """
@@ -155,7 +155,7 @@ def removeText(start_ea, end_ea):
     ea = start_ea
     while ea < end_ea:
         d = Data.Data(ea)
-        if idc.isASCII(d._getFlags()) and 'text ' in d.getOrigDisasm():
+        if idc.isASCII(d.getFlags()):
             found = True
             print("%07X: Make text -> Byte" % ea)
             idc.MakeByte(ea)
@@ -286,12 +286,96 @@ def collapseUnknowns(start_ea, end_ea, verbose=True):
     :return: Fix status
     """
     ea = start_ea
+    ea = next.byDataElement(ea, lambda ea: idc.isUnknown(idc.GetFlags(ea)), ui=False)
+    if ea >= end_ea:
+        return False
+
     while ea < end_ea:
-        ea = next.byDataElement(ea, lambda ea: idc.isUnknown(idc.GetFlags(ea)), ui=False)
         if verbose:
             print('%07X: make array till reference/name' % ea)
         ops.arrTillRef(ea)
+        ea = next.byDataElement(ea, lambda ea: idc.isUnknown(idc.GetFlags(ea)), ui=False)
     return True
+
+def expandUnkArrays(start_ea, end_ea, verbose=True):
+    """
+    Finds all named byte_xxx and dword_xxx arrays, and turns them to unknowns.
+    If an array is unnamed, and it's a byte array, it's also turned into unknowns.
+    :param start_ea: start of the range
+    :param end_ea: end of the range
+    :param verbose: if True, print all changes
+    :return: status of the expansion
+    """
+    d = Data.Data(start_ea)
+    while d.ea < end_ea:
+        if ( not idc.isAlign(d.getFlags())
+               and (
+                # known dummy array
+                (d.getName() and (d.getName().startswith('byte_') or d.getName().startswith('dword_')))
+                # byte/dword array
+                or (not d.getName() and type(d.getContent()) == list and
+                        (d.getSize() / len(d.getContent()) == 1 or d.getSize() / len(d.getContent()) == 4))
+
+        )):
+            if verbose: print('%07X: delete unk arr' % d.ea)
+            idc.del_items(d.ea, d.getSize())
+        d = Data.Data(d.ea + d.getSize())
+
+def getUnkPointers(fileRange, verbose=True, rom=True):
+    """
+    reports back all suspect unknown pointers within the file
+    :param fileRange:
+    :param verbose:
+    :return:
+    """
+    if verbose: print("(%07X, %07X): expand unknown arrays" % (fileRange[0], fileRange[1]))
+    expandUnkArrays(*fileRange, verbose=False)
+
+    output = []
+
+    ea = fileRange[0]
+    while ea < fileRange[1]:
+        ea = next.unkptr(ea, fileRange[1], rom=rom, ui=False, hexOut=False)
+        if ea != idaapi.BADADDR:
+            # get data at ea
+            chars = idc.get_bytes(ea, 4)
+            dword = 0
+            for i in range(len(chars)):
+                dword += ord(chars[i]) << 8 * i
+            output.append((ea, dword))
+
+    if verbose: print("(%07X, %07X): collapsing unknowns " % (fileRange[0], fileRange[1]))
+    collapseUnknowns(*fileRange, verbose=False)
+
+    return output
+
+def resolvePointers(fileRange, pointerRange, verbose=True):
+    """
+
+    :param fileRange: tuple of (int, int) representing the file to resolve pointers in
+    :param pointerRange: tuple of (int, int) representing range of pointers to resolve
+    :param verbose: if True, all changes are printed
+    :return:
+    """
+    if verbose: print("(%07X, %07X): expand unknown arrays" % (fileRange[0], fileRange[1]))
+    expandUnkArrays(*fileRange, verbose=False)
+
+    ea = fileRange[0]
+    while ea < fileRange[1]:
+        ea = next.unkptr(ea, fileRange[1], rom=True, ui=False, hexOut=False)
+        if ea != idaapi.BADADDR:
+            # get data at ea
+            chars = idc.get_bytes(ea, 4)
+            dword = 0
+            for i in range(len(chars)):
+                dword += ord(chars[i]) << 8 * i
+
+            if pointerRange[0] <= dword < pointerRange[1]:
+                if verbose: print('%07X: %07X' % (ea, dword))
+                idc.op_plain_offset(ea, 0, 0)
+
+    if verbose: print("(%07X, %07X): collapsing unknowns " % (fileRange[0], fileRange[1]))
+    collapseUnknowns(*fileRange, verbose=False)
 
 # ---
 def extendThumbFuncToLastPop(func_ea, lastInsn_ea, verbose=True):

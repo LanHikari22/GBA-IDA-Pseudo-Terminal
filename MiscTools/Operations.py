@@ -74,7 +74,7 @@ def registerUncompFile(ea, force=True):
     # type: (int) -> bool
     d = Data.Data(ea)
     compPtr = d.getContent()
-    if not idc.is_dword(d._getFlags()) or type(compPtr) == list:
+    if not idc.is_dword(d.getFlags()) or type(compPtr) == list:
         if not force: return False
         print('[%07X] -> dword' % (ea))
         forceItemOp(ea, idc.create_dword, ea)
@@ -122,7 +122,7 @@ def registerUncompFile(ea, force=True):
 def delShiftedContent(ea):
     d = Data.Data(ea)
     content = d.getContent()
-    if (content) == list or not d.getXRefsFrom()[1] or content < 0x8000000 or not d.isPointer(content):
+    if type(content) == list or not d.getXRefsFrom()[1] or content < 0x8000000 or not d.isPointer(content):
         return False
     dContent = Data.Data(content)
     if content == dContent.ea or dContent.isCode():
@@ -133,15 +133,18 @@ def delShiftedContent(ea):
     return True
 
 
-def delShiftedContentRange(start_ea, end_ea):
+def delShiftedContentRange(start_ea, end_ea, verbose=True):
     ea = start_ea
+    status = False
     while ea < end_ea:
         # print('%07X' % ea)
         d = Data.Data(ea)
         disasm = d.getDisasm()
         if delShiftedContent(ea):
-            print('%07X: del content %s' % (ea, disasm))
+            if not status: output = True
+            if verbose: print('%07X: del content %s' % (ea, disasm))
         ea += d.getSize()
+    return status
 
 def tillName(ea, f):
     d = Data.Data(ea)

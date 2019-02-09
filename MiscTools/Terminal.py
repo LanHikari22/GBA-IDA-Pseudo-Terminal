@@ -1,4 +1,7 @@
 import idaapi
+
+import MiscTools.miscTools
+
 idaapi.require('TerminalModule')
 idaapi.require('MiscTools.miscTools')
 idaapi.require('MiscTools.Operations')
@@ -30,11 +33,11 @@ class MiscTerminal(TerminalModule.TerminalModule, object):
 
         # register commands
         self.runTimeTests = MiscTools.TimeProfiler.runTimeTests
-        self.ea2gf = miscTools.ea2gf
-        self.sizeTillName = miscTools.sizeTillName
-        self.getLZ77CompressedSize = miscTools.getLZ77CompressedSize
-        self.findMostUsedFunctions = miscTools.findMostUsedFunctions
-        self.fnrepl = miscTools.fnrepl
+        self.ea2gf = MiscTools.miscTools.ea2gf
+        self.sizeTillName = MiscTools.miscTools.sizeTillName
+        self.getLZ77CompressedSize = MiscTools.miscTools.getLZ77CompressedSize
+        self.findMostUsedFunctions = MiscTools.miscTools.findMostUsedFunctions
+        self.fnrepl = MiscTools.miscTools.fnrepl
         self.plcv = miscTools.plcv
         self.nlrepl = miscTools.nlrepl
         self.rngmkd = miscTools.rngmkd

@@ -17,6 +17,9 @@ except NameError:
     ## search utils
     env['compareBinPath'] = ''
 
+    ## decomp path
+    env['decompPath'] = ''
+
     ## disassembly utils
     env['dismProjPath'] = ''
     # the path to put header *.inc files for the disassembly
@@ -28,4 +31,5 @@ except NameError:
     # file.s    | Code is disassembled
     # file.bin  | The binary content is extracted. Applies to all extentions in binAliases.
     env['gameFiles'] = None
-    # TODO: Not supported yet
+
+    # FIXME: I modified this after initiating pt and Hotkeys, and it wouldn't recognize the change. Had to restart IDA.

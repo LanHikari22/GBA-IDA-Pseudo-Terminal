@@ -1,4 +1,8 @@
 import idaapi
+import idautils
+
+import MiscTools.miscTools
+
 idaapi.require('IDAItems.Data')
 idaapi.require('IDAItems.Function')
 idaapi.require('IDAItems.Instruction')
@@ -36,42 +40,140 @@ def ida_run_python_function(func_name):
 
 
 def actionZ():
-    pass
     # return next.ret(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1])
     # return next.byDataElement(here(), lambda ea: ('POP' in idc.GetDisasm(ea) and 'PC' in idc.GetDisasm(ea))
     #                                              or 'PC, LR' in idc.GetDisasm(ea),
     #                           end_ea=env['gameFiles'][mt.ea2gf(here())][1])
     # fix.fixThumbPushPopFuncRanges(Function.Function(here()-4).func_ea, here())
     # return next.unkptr(here())
-    return ops.tillName(here(), ops.delShiftedContent)
+    # return ops.tillName(here(), ops.delShiftedContent)
+    currFile = env['gameFiles'][MiscTools.miscTools.ea2gf(here())]
+    if not ops.delShiftedContentRange(*currFile): print(False)
 
 
 def actionX():
     # Mainly for removing things, or fixing things.
     # return ops.tillName(here(), ops.delShiftedContent)
-    fix.collapseUnknowns(*env['gameFiles'][mt.ea2gf(here())])
+    if not fix.collapseUnknowns(*env['gameFiles'][MiscTools.miscTools.ea2gf(here())]):
+
+        print(False)
 
 def actionA():
-    # print(ops.arrTillName(here()))
-    print(ops.arrTillRef(here()))
+
+    def reportPointers(currFile):
+        unkPts = fix.getUnkPointers(currFile, rom=False, verbose=False)
+        filesUtilized = {} # dict of filename, [ptrs]
+        for ea, data in unkPts:
+            fileUsed = mt.ea2gf(data)
+            if fileUsed == '': fileUsed = 'ram'
+            if fileUsed in filesUtilized:
+                filesUtilized[fileUsed].append(data)
+            else:
+                filesUtilized[fileUsed] = [data]
+
+        print('[Report] Unknown Pointers in file %s:' % mt.ea2gf(currFile[0]))
+        for file in filesUtilized:
+            print('\t%s: %d pointers\n\t\t%s' % (file, len(filesUtilized[file]), mt.hexArr(filesUtilized[file])))
+    def arr2dword(pointerRange):
+        d = Data.Data(pointerRange[0])
+        outputStatus = True
+        while (d.ea < pointerRange[1]):
+            content = d.getContent()
+
+            # case: byte array that's 4 elements. Likely a word
+            if type(content) == list and len(content) == 4 and (d.getSize() / len(content) == 1):
+                # transform to dword
+                status = idc.del_items(d.ea)
+                status = status and idc.MakeDword(d.ea)
+                outputStatus = outputStatus and status
+                if status:
+                    print('[OK] %07X: u8[4] -> u32 %07X' % (d.ea, d.getContent()))
+                else:
+                    print('[FAIL] %07X: u8[4] -> u32' % d.ea)
+                # advance 4 bytes
+                d = Data.Data(d.ea + 4)
+            else:
+                d = Data.Data(d.ea + d.getSize())
+        return outputStatus
+
+    # print(arr2dword(env['gameFiles'][mt.ea2gf(here())]))
+    # print(arr2dword((0x8000000, 0x8800000)))
+
+    print(ops.arrTillName(here()))
+    # print(ops.arrTillRef(here()))
+    # fix.resolvePointers(currFile, currFile)
+
+    # for ea, name in idautils.Names():
+    #     if 'LibDebugMsg' in name:
+    #         name = name.replace('LibDebugMsg', 'LibInfoText')
+    #         print('%07X: name -> ' + name)
+    #         idc.MakeName(ea, name)
 
 
-def actionS(ea=None):
+    # for file in sorted(env['gameFiles'].keys(), key=env['gameFiles'].__getitem__):
+    #     if file.endswith('.s') and env['gameFiles'][file][0] >= 0x8000000:
+    #         print('')
+    #         reportPointers(env['gameFiles'][file])
+
+
+
+def actionS(ea=None, pointerRange=None):
     # Mainly for search-type actions or analysis
     if not ea: ea = here()
 
-    # output = next.unkptr(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1])
-    # output = next.red(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1])
-    # if output == idaapi.BADADDR:
-    #     print(False)
+    # if not pointerRange:
+    #     global ptrRange
+    #     try:
+    #         print('@input ptrRange=(%07X, %07X)' % (ptrRange[0], ptrRange[1]))
+    #     except Exception:
+    #         print('[input ptrRange]')
+    #     pointerRange = ptrRange
 
-    global v, cur
-    idaapi.jumpto(v[cur])
-    print('%07X [%d/%d]' % (v[cur], cur, len(v)))
-    cur += 1
+    def nextOneWordArr():
+        d = Data.Data(ea)
+        while (d.ea < pointerRange[1]):
+            content = d.getContent()
+
+            # case: byte array that's 4 elements. Likely a word
+            if type(content) == list and len(content) == 4 and (d.getSize() / len(content) == 1):
+                break
+            d = Data.Data(d.ea + d.getSize())
+
+        if d.ea >= pointerRange[1]:
+            print(False)
+        else:
+            print('%07X' % d.ea)
+            idc.jumpto(d.ea)
+
+    # output = next.unkptr(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1], pointerRange=pointerRange, showLabel=False)
+    # output = next.red(here(), end_ea=env['gameFiles'][mt.ea2gf(here())][1])
+    # output = next.ascii(here())
+
+    # if output == idaapi.BADADDR:
+    # print(False)
+
+
+            # global v, cur
+    # idaapi.jumpto(v[cur])
+    # print('%07X [%d/%d]' % (v[cur], cur, len(v)))
+    # cur += 1
 
     # ops.tillName(here(), lambda ea: idc.SetRegEx(ea, "T", 0, idc.SR_user))
     # pt.misc.getLZ77CompressedSize(pointerOf(here()) - (1<<31))
+
+    def nextCompressedData(ea, end_ea=None):
+        if not end_ea:
+            end_ea = idc.SegEnd(ea)
+
+        while ea < end_ea:
+            if MiscTools.miscTools.getLZ77CompressedSize(ea) != -1:
+                return ea
+            ea += 1
+        return -1
+
+    out = nextCompressedData(ea+1)
+    print('%07X' % out)
+    jumpto(out)
 
 def actionQ():
     # print(ops.arrTillName(here()))
@@ -80,8 +182,10 @@ def actionQ():
 
 def actionW():
     # fix.fixThumbPushPopFuncRanges(Function.Function(here() - 4).func_ea, here())
-    fix.makeThumb(*env['gameFiles'][mt.ea2gf(here())])
-    pass
+    # fix.makeThumb(*env['gameFiles'][mt.ea2gf(here())])
+    idc.jumpto(env['gameFiles'][mt.ea2gf(here())][0])
+    # print('jumped to %s' % mt.ea2gf(here()))
+
 
 # Convenient Actions
 #
@@ -132,12 +236,32 @@ def actionT():
 
     # print(mt.getLabelsWithSpaceDirective(0x2009450, 0x203a9b0))
     # print(mt.getLabelsWithSpaceDirective(0x203C4A0, 0x203F7E4))
+    global currSymbols, lastDump
+    if not currSymbols:
+        currSymbols = dis._listUpdatedSymbols('dev/dis/bn6f.elf')
+    if not lastDump:
+        lastDump = dis._listUpdatedSymbols('dev/dis/bn6f_ida.elf')
 
-    ea = 0x8000000
+    # separate changes made by IDA from external changes
+    newSymbols = []
+    for symbol in (currSymbols or lastDump):
+        if symbol not in lastDump:
+            newSymbols.append(symbol)
+
+    for ea, names in newSymbols:
+        if (len(names) == 1 and '_' in names[0][0]
+            and names[0][0][:names[0][0].index('_')+1] in ['loc_', 'unk_', 'byte_', 'word_', 'dword_', 'locret_']
+        ):
+            continue
+        print('%07X <%s>: ' % (ea, idc.Name(ea)) + str(names))
+
+def markStructOffsets():
+    ea = here()
     while ea < 0x8800000:
         if Function.isFunction(ea):
             f = Function.Function(ea)
-            # markToolkit(f.func_ea)
+            print(f.getName())
+            markToolkit(f.func_ea)
             markStructFromToolkit(f.func_ea, 0x3C, 'oGameState')
             ea += f.getSize(withPool=True)
         else:
@@ -199,12 +323,12 @@ def markStructFromToolkit(func_ea, structOff, structName):
                 accessInsn = Instruction.Insn(access)
                 if accessInsn.ops[1].type == ida_ua.o_displ:
                     if accessInsn.ops[1].addr == structOff:
-                        print(hex(access), idc.GetDisasm(access))
+                        # print(hex(access), idc.GetDisasm(access))
 
                         structAcccesses = FuncAnalyzer.traceRegVar(f.func_ea, f.func_ea + f.getSize(withPool=False),
                                                                    accessInsn.ops[0].reg, regVarIdx+1)
                         for structAccess in structAcccesses:
-                            print(hex(structAccess), idc.GetDisasm(structAccess))
+                            # print(hex(structAccess), idc.GetDisasm(structAccess))
                             idc.op_enum(structAccess, 1, idc.get_enum(structName), 0)
     return True
 

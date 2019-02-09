@@ -56,7 +56,7 @@ def ascii(ea, ui=True):
     while ea < end_ea:
         d = Data.Data(ea)
         # ARM, unless it's a branch
-        if idc.isASCII(d._getFlags()):
+        if idc.isASCII(d.getFlags()):
             output = ea
             break
         ea += d.getSize()
@@ -131,7 +131,7 @@ def known(ea, ui=True):
     output = idaapi.BADADDR
     while ea < end_ea:
         d = Data.Data(ea)
-        if not idc.isUnknown(d._getFlags()):
+        if not idc.isUnknown(d.getFlags()):
             output = ea
             break
         ea += d.getSize()
@@ -454,13 +454,17 @@ def ref(ea, end_ea=None, ui=True, hexOut=True):
 
     return output
 
-def unkptr(ea, end_ea=None, rom=True, ui=True, hexOut=True):
+def unkptr(ea, end_ea=None, rom=True, pointerRange=None, ui=True, hexOut=True, showLabel=True):
+    # type: (int, int, bool, tuple[int, int], bool, bool, bool) -> int
     """
     Finds the next occurance of data that can suspected to be a pointer but not defined as such
     :param ea: ea to start searching from
+    :param end_ea: end range of serch
+    :param rom: whether to consider only 0x8000000 region, or all RAM
+    :param pointerRange: if specified, only pointers within that region are given
     :param ui: if True, jump to address automatically
     :param end_ea: the last address of the search range. If -1, end of segment is used
-    :return: range of ea of next unknown/unexplored pointer
+    :return:  ea of next unknown/unexplored pointer
     """
 
     output = idaapi.BADADDR
@@ -483,8 +487,10 @@ def unkptr(ea, end_ea=None, rom=True, ui=True, hexOut=True):
         # if dword % (1<<31):
         #     dword -= 1<<31
 
-        # check if dword is a valid pointer
-        if rom:
+        # check if dword is within range
+        if pointerRange:
+            inRange = pointerRange[0] <= dword < pointerRange[1]
+        elif rom:
             inRange = 0x08000000 <= dword < 0x08800000 #0x09FFFFFF
         else:
             inRange = (0x02000000 <= dword < 0x02040000 or
@@ -494,10 +500,13 @@ def unkptr(ea, end_ea=None, rom=True, ui=True, hexOut=True):
             if not d.isCode() and not d.getXRefsFrom()[1]:
                 output = ea
                 if hexOut:
-                    dwordData = Data.Data(dword)
-                    offset = dword - dwordData.ea
-                    offset = ('+0x%X' % offset) if offset else ''
-                    print('%07X: %07X <%s%s>' % (ea, dword, dwordData.getName(), offset))
+                    if showLabel:
+                        dwordData = Data.Data(dword)
+                        offset = dword - dwordData.ea
+                        offset = ('+0x%X' % offset) if offset else ''
+                        print('%07X: %07X <%s%s>' % (ea, dword, dwordData.getName(), offset))
+                    else:
+                        print('%07X: %07X' % (ea, dword))
                 break
         if d.getXRefsFrom()[1]:
             ea += d.getSize()

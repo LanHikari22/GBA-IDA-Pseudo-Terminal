@@ -52,6 +52,7 @@ class DisTerminal(TerminalModule.TerminalModule, object):
         # register commands
         self.push = gnuDis.push
         self.extract = gnuDis.extract
+        self.decomp = gnuDis.decomp
         self.checkExtractedCode = gnuDis.checkExtractedCode
         self.rng = gnuDis.rng
         self.rngExterns = gnuDis.rngExterns
@@ -62,6 +63,7 @@ class DisTerminal(TerminalModule.TerminalModule, object):
         self.formatGameFiles = gnuDis.formatGameFiles
         self.registerCommand(self.push, "push()")
         self.registerCommand(self.extract, "extract()")
+        self.registerCommand(self.decomp, "decomp(decompPath, gameFiles=None)")
         self.registerCommand(self.checkExtractedCode, "checkExtractedCode()")
         self.registerCommand(self.rng, "rng(start_ea, end_ea)")
         self.registerCommand(self.rngExterns, "rngExterns(start_ea, end_ea)")
