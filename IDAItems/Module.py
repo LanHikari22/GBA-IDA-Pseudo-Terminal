@@ -7,12 +7,6 @@
 import idaapi
 import idautils
 import idc_bc695
-
-idaapi.require('BinarySearcher')
-idaapi.require('Definitions.Architecture')
-idaapi.require('IDAItems.GameFile')
-idaapi.require('IDAItems.Function')
-
 from SrchTools.BinarySearcher import BinarySearcher
 from Definitions.Architecture import ROM_SEG
 from IDAItems.GameFile import GameFile

@@ -11,8 +11,6 @@ import idc
 
 from IDAItems import Data
 
-idaapi.require("IDAItems.Data")
-
 class FunctionException(Exception):
     def __init__(self, s):
         super(Exception, self).__init__(s)

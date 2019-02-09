@@ -1,12 +1,5 @@
-import idaapi
-
 from IDAItems import Function, Data
 
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-idaapi.require("TerminalModule")
-
-import TerminalModule
 
 class MemAccessReader:
     """

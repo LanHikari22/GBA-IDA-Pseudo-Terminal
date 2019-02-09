@@ -1,6 +1,3 @@
-import idaapi
-idaapi.require('Definitions.Environment')
-
 from Definitions import Environment
 
 

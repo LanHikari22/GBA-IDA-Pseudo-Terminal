@@ -1,13 +1,6 @@
-import idaapi
 import idc
-
 from DisasmTools import Terminal
-from IDAItems import Data
 import SrchTools.nextTools as next
-
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-
 from IDAItems import Data
 
 

@@ -1,8 +1,3 @@
-import idaapi
-idaapi.require("TerminalModule")
-idaapi.require("SrchTools.srchTools")
-idaapi.require("SrchTools.nextTools")
-
 import TerminalModule
 import SrchTools.srchTools
 import SrchTools.nextTools

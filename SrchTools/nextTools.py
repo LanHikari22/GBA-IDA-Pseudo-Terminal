@@ -1,11 +1,6 @@
 # @file next
 # tools for finding the next occurrance of something
 import idaapi
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-idaapi.require("IDAItems.InstDecoder")
-idaapi.require("TerminalModule")
-
 import idautils
 import idc
 from IDAItems import Function, Data, InstDecoder

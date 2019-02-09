@@ -1,18 +1,6 @@
 # @file fixTools
 # utilities for automatic fixing go here!
-import idaapi
-import idautils
-
-from SrchTools import srchTools, nextTools
-
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-idaapi.require("FixTools.fixTools")
-idaapi.require("TerminalModule")
-
 from FixTools import fixTools
-import idc
-from IDAItems import Function, Data, InstDecoder
 import TerminalModule
 
 class fix(TerminalModule.TerminalModule, object):

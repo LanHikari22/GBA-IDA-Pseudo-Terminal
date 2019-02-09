@@ -1,11 +1,6 @@
-import idaapi
 import idc
 import time
-
 import IDAItems
-
-idaapi.require('IDAItems.Data')
-
 from IDAItems import Data
 
 def new():

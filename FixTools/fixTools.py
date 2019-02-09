@@ -1,14 +1,9 @@
 # @file fixTools
 # utilities for automatic fixing go here!
 import idaapi
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-
-from idaapi import ida_ua
 import idautils
 import idc
 import SrchTools.nextTools as next
-import SrchTools.srchTools as srch
 import MiscTools.Operations as ops
 from IDAItems import Function, Data, InstDecoder, Instruction
 

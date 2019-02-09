@@ -7,12 +7,6 @@ import idc_bc695
 
 from Definitions.Environment import env
 
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-idaapi.require("TerminalModule")
-idaapi.require("MiscTools.MemAccessReader")
-idaapi.require('MiscTools.Operations')
-
 from Definitions import Architecture, Paths
 import idc
 from IDAItems import Data, Function

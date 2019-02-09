@@ -1,10 +1,3 @@
-import idaapi
-idaapi.require('DisasmTools.Terminal')
-idaapi.require('FixTools.Terminal')
-idaapi.require("MiscTools.Terminal")
-idaapi.require("SrchTools.Terminal")
-idaapi.require("TerminalModule")
-idaapi.require("Definitions.Environment")
 from Definitions import Environment
 import TerminalModule
 
@@ -104,10 +97,11 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
                 Environment.env[key] = None
 
 
-
-
-
 if __name__ == '__main__':
+    # ida caches source. In active development, this forces it to re-read source
+    import __init__
+    __init__.require_project()
+
     pt = PseudoTerminal()
     if pt._initialized:
         pt.echo("PseudoTerminal, ready for combat!")

@@ -1,16 +1,10 @@
 import idautils
 import idc
 import idc_bc695
-
-from Tests import Test
-from IDAItems import Data
+from IDAItems.Tests import Test
 from Definitions import Paths
 from Definitions import Architecture
-import idaapi
 
-idaapi.require("Tests.Test")
-idaapi.require("Definitions.Paths")
-idaapi.require("Definitions.Architecture")
 
 class DBProblemsTest:
 

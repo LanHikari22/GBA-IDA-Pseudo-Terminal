@@ -3,8 +3,6 @@
 # This module classifies a Data type and defines operations done on them using the IDA API
 #
 import idaapi
-idaapi.require("IDAItems.Instruction")
-
 import re
 import ida_bytes
 import idautils

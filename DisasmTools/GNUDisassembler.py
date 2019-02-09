@@ -13,9 +13,6 @@ from IDAItems import Function, Data
 import os
 import re
 
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-
 class GNUDisassembler:
     """
     This module contains utilities that help with disassembly exporting from IDA.

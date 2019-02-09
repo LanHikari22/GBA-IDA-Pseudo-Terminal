@@ -1,10 +1,7 @@
 from Tests import Test
 from IDAItems import GameFile, Function, Data
 import idaapi
-idaapi.require("Tests.Test")
-idaapi.require("IDAItems.GameFile")
-idaapi.require("IDAItems.Function")
-idaapi.require("IDAItems.Data")
+
 
 
 class GameFileTest:

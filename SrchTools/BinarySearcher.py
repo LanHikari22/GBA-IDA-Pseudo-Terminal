@@ -10,17 +10,12 @@
 
 import os
 import time
-
 import idautils
 import idc_bc695
-
 from Definitions.Architecture import ROM_SEG
 from Definitions.Architecture import INSTRUCTION_WIDTH
 from Definitions.Paths import ROM_PATH, IDATOOLS_PATH
 from IDAItems import Function
-
-
-from Command import c
 
 # Constants  -----------------------------------------------------------------------------------------------------------
 INVALID_FUNCTION = -1

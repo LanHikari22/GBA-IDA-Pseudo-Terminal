@@ -1,12 +1,8 @@
-from Tests import Test
+from IDAItems.Tests import Test
 from IDAItems import Data
 from Definitions import Paths
 from Definitions import Architecture
-import idaapi
-idaapi.require("Tests.Test")
-idaapi.require("IDAItems.Data")
-idaapi.require("Definitions.Paths")
-idaapi.require("Definitions.Architecture")
+
 
 class DataTest:
 

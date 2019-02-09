@@ -1,10 +1,5 @@
-from Tests import Test
+from IDAItems.Tests import Test
 from IDAItems import Function, Data
-import idaapi
-idaapi.require("Tests.Test")
-idaapi.require("IDAItems.Function")
-idaapi.require("IDAItems.Data")
-
 
 
 class FunctionTest:

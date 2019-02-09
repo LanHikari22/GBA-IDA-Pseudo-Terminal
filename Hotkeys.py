@@ -1,15 +1,5 @@
 import idaapi
-import idautils
-
 import MiscTools.miscTools
-
-idaapi.require('IDAItems.Data')
-idaapi.require('IDAItems.Function')
-idaapi.require('IDAItems.Instruction')
-idaapi.require('MiscTools.Operations')
-idaapi.require('MiscTools.miscTools')
-idaapi.require('MiscTools.FuncAnalyzer')
-idaapi.require('DisasmTools.GNUDisassembler')
 import MiscTools.miscTools as mt
 import MiscTools.TimeProfiler as tp
 from MiscTools import FuncAnalyzer
@@ -353,4 +343,8 @@ def setHotkeys():
     print('Hotkeys set!')
 
 if __name__ == '__main__':
+    # ida caches source. In active development, this forces it to re-read source
+    import __init__
+    __init__.require_project()
+
     setHotkeys()

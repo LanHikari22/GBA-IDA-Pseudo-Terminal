@@ -1,13 +1,4 @@
-import idaapi
-
 import MiscTools.miscTools
-
-idaapi.require('TerminalModule')
-idaapi.require('MiscTools.miscTools')
-idaapi.require('MiscTools.Operations')
-idaapi.require('MiscTools.MemAccessReader')
-idaapi.require('MiscTools.TimeProfiler')
-
 import TerminalModule
 from MiscTools import miscTools
 import MiscTools.Operations

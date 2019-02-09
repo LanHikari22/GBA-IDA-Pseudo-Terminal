@@ -1,12 +1,5 @@
 # @file disasmTools
 # provides utility commands for disassembling
-import idaapi
-idaapi.require("IDAItems.Data")
-idaapi.require("IDAItems.Function")
-idaapi.require("TerminalModule")
-idaapi.require("DisasmTools.GNUDisassembler")
-import idc
-from IDAItems import Function, Data
 import TerminalModule
 import GNUDisassembler
 

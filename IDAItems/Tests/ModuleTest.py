@@ -1,11 +1,7 @@
 from Definitions.Paths import OTHER_VERSION_BIN_PATH
 from IDAItems.Module import Module, ModuleException
 from IDAItems import GameFile, Function
-from Tests import Test
-import idaapi
-idaapi.require("IDAItems.Module")
-idaapi.require("IDAItems.GameFile")
-idaapi.require("Tests.Test")
+from IDAItems.Tests import Tes
 
 def testInit():
     # type: () -> None
