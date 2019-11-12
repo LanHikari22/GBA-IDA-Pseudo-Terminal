@@ -42,15 +42,16 @@ def getSymTable(elfPath):
     os.remove(tmpStderr)
     return symTable
 
-def listUpdatedSymbols(elfPath):
+def listUpdatedSymbols(elfPath, symTable):
     """
     Searches through the symtable in the elfPath, and computes a list of name_eas, and their
     new names
     :param elfPath: path of the elf file to process
+    :param symTable: use instead of recalculating from elf
     :return: list of (name_ea, new_name)
     """
     output = []
-    symTable = getSymTable(elfPath)
+    if not symTable: symTable = getSymTable(elfPath)
 
     # compute all names in RAM and ROM
     names = []

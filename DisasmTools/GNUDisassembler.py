@@ -142,7 +142,8 @@ class GNUDisassembler:
                 if decomp:
                     decomp = decomp.replace('  ', '    ')
                     decomp = decomp.replace('\t', '    ')
-                    cFile = open(self.projPath + decompPath + self._getBaseFilename(file)[:-2] + '.c', 'w')
+                    print(self.projPath, decompPath)
+                    cFile = open(self.projPath[0] + decompPath + self._getBaseFilename(file)[:-2] + '.c', 'w')
                     cFile.write(decomp)
                     cFile.close()
 

@@ -22,6 +22,7 @@ class InstTest:
         self.test.run()
 
     def testPushPop(self):
+        pass
 
     def testBasic(self):
         # type: () -> None

@@ -3,8 +3,8 @@
 # TODO: fix this so that it's all relative to this project only
 IDATOOLS_PATH = ''
 ROM_PATH = ''
-PROJ_PATH = IDATOOLS_PATH + '..\\..\\'
-DEFS_DIR = IDATOOLS_PATH + '..\\..\\Definitions\\'
+PROJ_PATH = IDATOOLS_PATH + '..\\..\\..\\' # path of the repository in use
+DEFS_DIR = PROJ_PATH + 'Definitions\\'
 VERSION_DIR = 'Falzar\\'
 OTHER_VERSION_DIR = 'Gregar\\'
-OTHER_VERSION_BIN_PATH = IDATOOLS_PATH + '..\\..\\mmbn6g.gba'
+OTHER_VERSION_BIN_PATH = PROJ_PATH + 'mmbn6g.gba'

@@ -269,8 +269,6 @@ def getLZ77CompressedSize(compressed_ea):
     if (dataHeader & 0xF0) >> 4 != 1:
         return -1
 
-    print('decompressed size: 0x%X' % decompSize)
-
     # iterate, and figure out the number of bytes copied
     size = 0
     ea = compressed_ea + 4
@@ -304,6 +302,8 @@ def getLZ77CompressedSize(compressed_ea):
                     if flags & (1<<j) != 0:
                         return -3
                 break
+
+    print('decompressed size: 0x%X' % decompSize)
     return ea-compressed_ea
 
 
@@ -324,3 +324,17 @@ def ea2gf(ea):
             output = file
             break
     return output
+
+def repo_replace(ea, name, oldName=None):
+    """
+    replaces a name in both the repository and the database
+    :param ea: effective address
+    :param name: new name
+    """
+    import os
+    if not oldName: oldName = idc.Name(ea)
+    cwd = os.getcwd()
+    os.chdir(env['projPath'])
+    os.system('replace.sh %s %s &' % (oldName, name))
+    os.chdir(cwd)
+    idc.set_name(ea, name)

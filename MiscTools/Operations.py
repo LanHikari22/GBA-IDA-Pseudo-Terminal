@@ -229,7 +229,9 @@ def delRange(start_ea, end_ea):
 
 def pointerOf(ea):
     d = Data.Data(ea)
-    c = d.getContent();
+    c = d.getContent()
+    if type(c) == list:
+        c = c[(ea - d.ea)/4]
     # bit 31 set for compressed pointers
     isCompressedPointer = c & (1 << 31)
     if isCompressedPointer: c -= (1 << 31)

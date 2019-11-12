@@ -1,18 +1,18 @@
 import idaapi
-import MiscTools.miscTools
-import MiscTools.miscTools as mt
-import MiscTools.TimeProfiler as tp
-from MiscTools import FuncAnalyzer
-from IDAItems import Data, Function, Instruction
-
 import idc
 import ida_enum
 import ida_ua
+import MiscTools.miscTools
+from MiscTools import FuncAnalyzer
+from IDAItems import Data, Function, Instruction
 from idc_bc695 import AddHotkey
 from idc import here
 import MiscTools.Operations as ops
 import SrchTools.nextTools as next
+import SrchTools.srchTools as st
 import FixTools.fixTools as fix
+import MiscTools.miscTools as mt
+import MiscTools.TimeProfiler as tp
 import DisasmTools.GNUDisassembler as dis
 from Definitions.Environment import env
 
@@ -38,15 +38,23 @@ def actionZ():
     # return next.unkptr(here())
     # return ops.tillName(here(), ops.delShiftedContent)
     currFile = env['gameFiles'][MiscTools.miscTools.ea2gf(here())]
-    if not ops.delShiftedContentRange(*currFile): print(False)
+    # if not ops.delShiftedContentRange(*currFile): print(False)
+    pass
 
 
 def actionX():
     # Mainly for removing things, or fixing things.
     # return ops.tillName(here(), ops.delShiftedContent)
-    if not fix.collapseUnknowns(*env['gameFiles'][MiscTools.miscTools.ea2gf(here())]):
+    def collapseUnknowns():
+        if not fix.collapseUnknowns(*env['gameFiles'][MiscTools.miscTools.ea2gf(here())]):
+            print(False)
+    def filterChangedSyms():
+        global syms
+        if not syms: syms = st.getSymTable(env['elfPath'])
+        out = syms.copy()
+        # for ea, name in out:
+            # if '_' in name and name[:name.lindex('_')] in ['sub', 'loc', '']
 
-        print(False)
 
 def actionA():
 
@@ -89,8 +97,8 @@ def actionA():
     # print(arr2dword(env['gameFiles'][mt.ea2gf(here())]))
     # print(arr2dword((0x8000000, 0x8800000)))
 
-    print(ops.arrTillName(here()))
-    # print(ops.arrTillRef(here()))
+    # print(ops.arrTillName(here()))
+    print(ops.arrTillRef(here()))
     # fix.resolvePointers(currFile, currFile)
 
     # for ea, name in idautils.Names():
@@ -156,14 +164,14 @@ def actionS(ea=None, pointerRange=None):
             end_ea = idc.SegEnd(ea)
 
         while ea < end_ea:
-            if MiscTools.miscTools.getLZ77CompressedSize(ea) != -1:
+            if mt.getLZ77CompressedSize(ea) >= 0:
                 return ea
             ea += 1
         return -1
 
     out = nextCompressedData(ea+1)
-    print('%07X' % out)
-    jumpto(out)
+    print('%07X' % (out))
+    idaapi.jumpto(out)
 
 def actionQ():
     # print(ops.arrTillName(here()))

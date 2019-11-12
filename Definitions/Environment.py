@@ -10,6 +10,9 @@ try:
 except NameError:
     env = dict()
 
+    # proj path
+    env['projPath'] = ''
+
     ## ROM Paths
     env['ROMPath'] = ''
     env['elfPath'] = ''

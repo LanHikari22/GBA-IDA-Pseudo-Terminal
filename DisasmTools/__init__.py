@@ -5,4 +5,5 @@ def require_package():
     idaapi.require('DisasmTools.AsmConstParser')
     idaapi.require('DisasmTools.AsmStructParser')
     idaapi.require('DisasmTools.GNUDisassembler')
+    idaapi.require('DisasmTools.source_sync')
     idaapi.require('DisasmTools.Terminal')
