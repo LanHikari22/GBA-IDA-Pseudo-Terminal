@@ -223,20 +223,25 @@ def fixFunctionRanges(start_ea, end_ea):
                 break
         # figure out the first return, and return type of this function. That should be consistent
         ret_ea = next.ret(f.func_ea, ui=False, hexOut=False)
-        retType = InstDecoder.Inst(ret_ea).fields['magic']
-        # modify the function range to include all returns
-        if Function.isFunction(ret_ea):
-            ret_ea = next.unkret(f.func_ea, ui=False, hexOut=False)
-            # this ret_ea is not within the function, if the return type is different
-            if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
-                continue
-        while f.func_ea < ret_ea < stop_ea:
-            # detected that the function range is invalid, fix range
-            print('ret %07X' % ret_ea)
-            ret_ea = next.unkret(ret_ea, ui=False, hexOut=False)
-            # this ret_ea is not within the function, if the return type is different
-            if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
-                break
+        try:
+            retType = InstDecoder.Inst(ret_ea).fields['magic']
+            # modify the function range to include all returns
+            if Function.isFunction(ret_ea):
+                ret_ea = next.unkret(f.func_ea, ui=False, hexOut=False)
+                # this ret_ea is not within the function, if the return type is different
+                if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
+                    continue
+            while f.func_ea < ret_ea < stop_ea:
+                # detected that the function range is invalid, fix range
+                print('ret %07X' % ret_ea)
+                ret_ea = next.unkret(ret_ea, ui=False, hexOut=False)
+                # this ret_ea is not within the function, if the return type is different
+                if InstDecoder.Inst(ret_ea).fields['magic'] != retType:
+                    break
+                idc.add_func(func_ea, ret_ea + 2)
+        except ValueError:
+            continue
+            # print('error: could not decode instruction at {:07X} for function {:07X}'.format(ret_ea, f.func_ea))
 
 def removeFakeRedCode(start_ea, end_ea):
     """
@@ -245,7 +250,7 @@ def removeFakeRedCode(start_ea, end_ea):
     :param end_ea: end of the range to fix
     :return:
     """
-    srchNext = srchTools.nextTools.next()
+    srchNext = next
     redStart_ea, redEnd_ea = srchNext.fakered(start_ea, end_ea, ui=False, hexOut=False)
     while redStart_ea < end_ea:
         # change to bytes
@@ -260,8 +265,8 @@ def removeRedCode(start_ea, end_ea):
     :param end_ea: end of the region
     :return:
     """
-    srchNext = srchTools.nextTools.next()
-    redStart_ea = redEnd_ea = srchNext.red(start_ea, end_ea, ui=False, hexOut=False)
+    srchNext = next
+    redStart_ea = redEnd_ea = srchNext.red(start_ea, end_ea, ui=False)
     while redEnd_ea < end_ea:
         d = Data.Data(redEnd_ea)
         while d.isCode() and not Function.isFunction(d.ea):
@@ -270,7 +275,7 @@ def removeRedCode(start_ea, end_ea):
         # change to bytes
         print("%07X: del red code (%07X, %07X)" % (redStart_ea, redStart_ea, redEnd_ea))
         idc.del_items(redStart_ea, 0, redEnd_ea - redStart_ea)
-        redStart_ea = redEnd_ea = srchNext.red(redEnd_ea, end_ea, ui=False, hexOut=False)
+        redStart_ea = redEnd_ea = srchNext.red(redEnd_ea, end_ea, ui=False)
 
 def collapseUnknowns(start_ea, end_ea, verbose=True):
     """
@@ -369,8 +374,9 @@ def resolvePointers(fileRange, pointerRange, verbose=True):
                 if verbose: print('%07X: %07X' % (ea, dword))
                 idc.op_plain_offset(ea, 0, 0)
 
-    if verbose: print("(%07X, %07X): collapsing unknowns " % (fileRange[0], fileRange[1]))
-    collapseUnknowns(*fileRange, verbose=False)
+    # FIXME: due to a weird update behavior, you have to iterate through the entire range before collapsing back
+    # if verbose: print("(%07X, %07X): collapsing unknowns " % (fileRange[0], fileRange[1]))
+    # collapseUnknowns(*fileRange, verbose=False)
 
 # ---
 def extendThumbFuncToLastPop(func_ea, lastInsn_ea, verbose=True):

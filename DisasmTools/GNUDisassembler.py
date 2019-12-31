@@ -409,7 +409,7 @@ class GNUDisassembler:
                 ea = ea + d.getSize()
 
         # add comment for debugging purposes
-        disasm += "/*For debugging purposes, connect comment at any range!*/\n"
+        # disasm += "/*For debugging purposes, connect comment at any range!*/\n"
 
         return disasm
 

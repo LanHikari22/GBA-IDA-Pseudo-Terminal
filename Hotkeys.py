@@ -351,8 +351,4 @@ def setHotkeys():
     print('Hotkeys set!')
 
 if __name__ == '__main__':
-    # ida caches source. In active development, this forces it to re-read source
-    import __init__
-    __init__.require_project()
-
     setHotkeys()

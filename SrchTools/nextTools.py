@@ -92,7 +92,7 @@ def fakeinst(ea, ui=True):
     if ui: idaapi.jumpto(ea)
     return output
 
-def name(ea, ui=True, hexOut=True, reverse=False):
+def name(ea, ui=True, hexOut=True):
     """
     Finds the next ea with which a name exists
     :param ea: ea to start searching from
@@ -237,20 +237,20 @@ def immref(ea, ui=True):
     if ui: idaapi.jumpto(ea)
     return '%07X' % output
 
-def ret(ea, end_ea=None, ui=True, hexOut=True):
+def ret(ea, end_ea=idaapi.BADADDR, ui=True, hexOut=True):
     """
     Looks for the next data item that encodes a function return
     - BX LR
     - MOV PC, LR
-    - PUSH {..., LR} [Up to instLimit gap insts] POP {..., LR} (regLists must be matching)
+    - PUSH {..., LR} [Up to instLi  mit gap insts] POP {..., LR} (regLists must be matching)
     - POP {R<X>} [Up to instLimit gap insts] BX R<X>
     :param ea: ea to start searching from
     :param end_ea: the last address to look for
     :param ui: if True, jump to address automatically
     :param hexOut: output hex formatted ea instead
-    :return: ea of next ret
+    :return: ea of next ret or 0xFFFFFFFF
     """
-    # state machine states for differnt return types that take more than one instruction
+    # state machine states for different return types that take more than one instruction
     ST_NONE = 0
     ST_PUSH = 1
     ST_BX = 2
@@ -266,28 +266,35 @@ def ret(ea, end_ea=None, ui=True, hexOut=True):
     # don't count this item
     ea = Data.Data(ea).ea + Data.Data(ea).getSize()
     output = idaapi.BADADDR
-    # use default end_ea, if no search limit is provided
-    if not end_ea: end_ea = end_ea
+
     while ea < end_ea:
-        currInst = InstDecoder.Inst(ea).fields
+        try:
+            currInst = InstDecoder.Inst(ea).fields
+        except ValueError:
+            currInst = None
+
+        # MOV PC, LR or BX LR are guaranteed ends
         if currInst and (currInst['magic'] == InstDecoder.INST_MOV_PC_LR or
                          currInst['magic'] == InstDecoder.INST_BX and currInst['reg'] == 14):
             output = ea
             break
+
         if state == ST_NONE:
+            # print('{:07X} ST_NONE'.format(ea))
             if currInst and currInst['magic'] == InstDecoder.INST_PUSHPOP:
                 regs = InstDecoder.getPushPopRegisters(currInst['Rlist'])
-                # PUSH {PC. ...}
+                # PUSH {..., LR}
                 if not currInst['pop'] and currInst['lr']:
                     state = ST_PUSH
                     pushRegs = regs
-                # POP {R<X>}
+                # POP {rX}, matching for POP {rX} BX rX
                 elif currInst['pop'] and not currInst['lr'] and len(regs) == 1:
                     state = ST_BX
                     bxReg = regs[0]
 
         # look for a matching  POP {..., PC}
         elif state == ST_PUSH:
+            # print('{:07X} ST_PUSH'.format(ea))
             if (currInst and currInst['magic'] == InstDecoder.INST_PUSHPOP and
                 currInst['pop'] and currInst['lr']):
                 regs = InstDecoder.getPushPopRegisters(currInst['Rlist'])
@@ -295,8 +302,9 @@ def ret(ea, end_ea=None, ui=True, hexOut=True):
                     output = ea
                     break
 
-        # look for a matching BX R<X>
+        # look for a matching BX rX
         elif state == ST_BX:
+            # print('{:07X} ST_BX'.format(ea))
             if currInst and currInst['magic'] == InstDecoder.INST_BX and currInst['reg'] == bxReg:
                 output = ea
                 break
@@ -359,7 +367,11 @@ def deadfunc(ea, end_ea=None, ui=True, hexOut=True):
     while ea < end_ea:
         # the current item must not belong to a function, or have any data xrefs
         if not Function.isFunction(ea) and not Data.Data(ea).getXRefsTo()[1]:
-            inst = InstDecoder.Inst(ea).fields
+            try:
+                inst = InstDecoder.Inst(ea).fields
+            except ValueError:
+                ea += 2
+                continue
             # if PUSH {..., LR}
             if inst and inst['magic'] == InstDecoder.INST_PUSHPOP and not inst['pop'] and inst['lr']:
                 foundPush = True

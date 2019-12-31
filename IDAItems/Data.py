@@ -331,7 +331,7 @@ class Data:
         # disasm = self._convertTabs(disasm)
         return disasm
 
-    def getFormattedDisasm(self):
+    def getFormattedDisasm(self, file_range):
         """
         puts together the name label, comment, and disassembly, as well as proper spacing
         :return:
@@ -340,6 +340,10 @@ class Data:
         disasm = ''
         # include label
         if name:
+            if self.isGlobal(file_range):
+                disasm = name + '::'
+            else:
+                disasm = name + ':'
             disasm = name + ':'
             # only add a new line for code labels
             if self.isCode():

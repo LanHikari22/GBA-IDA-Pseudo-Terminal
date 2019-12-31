@@ -38,6 +38,7 @@ def authInstruction(inst, magic, opSize):
         output = False
     return output
 
+
 def decode(inst):
     """
     Decodes the instruction and returns a dictionary of its fields. All dictionaries have the magic key,
@@ -53,6 +54,7 @@ def decode(inst):
         output = {'name': 'INST_MOV_PC_LR', 'magic': INST_MOV_PC_LR}
     if output: output['inst'] = '0x%X' % inst
     return output
+
 
 def decodeLdrStr(inst):
     """
@@ -135,7 +137,6 @@ def decodeLdrStr(inst):
     return output
 
 
-
 def decodePushPop(inst):
     """
         Decodes a push/pop instruction and returns a table with fields from the inst.
@@ -164,7 +165,6 @@ def decodePushPop(inst):
     return output
 
 
-
 def decodeBX(inst):
     """
     If this is a BX instruction, this will return a dictionary containing its magic (INST_BX), and reg number
@@ -179,7 +179,6 @@ def decodeBX(inst):
     return output
 
 
-
 def decodeMovImm(inst):
     """
     returns None or {magic=MOV_IMM, Rd, imm}
@@ -192,7 +191,6 @@ def decodeMovImm(inst):
                   "Rd": (inst & 0x700) >> 8,
                   "imm": inst & 0xFF}
     return output
-
 
 
 def decodePCRel(inst):
@@ -212,6 +210,7 @@ def decodePCRel(inst):
                   "pc_offset": 4 * (inst & word8)}  # it's 4 times because this is a word offset
     return output
 
+
 def getPushPopRegisters(Rlist):
     """
     Returns the list of registers from regList for PUSH/POP instructions
@@ -228,6 +227,7 @@ def getPushPopRegisters(Rlist):
         regNo += 1
     return output
 
+
 class Inst:
     def __init__(self, inst, isContent=False):
         # type: (int, bool) -> ()
@@ -235,6 +235,7 @@ class Inst:
         Loads the content at the specified address inst. if isContent, inst itself is taken as the content
         :param inst: linear address of instuction item, or the content itself
         :param isContent: whether inst is a linear address or content
+        :raises ValueError: if the instruction could not be decoded
         """
         if isContent:
             self.inst = inst
@@ -243,3 +244,5 @@ class Inst:
             self.inst = ord(self.inst[0]) + (ord(self.inst[1]) << 8)
             # TODO: if it's a BL, it's 4 bytes, figure that out here
         self.fields = decode(self.inst)
+        if self.fields == None:
+            raise ValueError('could not decode {:X}'.format(inst))

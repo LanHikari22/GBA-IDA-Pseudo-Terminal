@@ -12,13 +12,14 @@ class TerminalModule:
         self.registerHelp(self, fmt + '\n')
         self.commands = []
         self.modules = []
+        self.registerSelfCommands()
 
     def __str__(self):
         return self.help(self)
 
     def registerModule(self, module):
         """
-        Adds the module to the list of moudles and registers its help
+        Adds the module to the list of modules and registers its help
         :param module: module to register within this module
         :return:
         """
@@ -40,6 +41,48 @@ class TerminalModule:
         self.registerFmt(cmdf, fmt)
         self.registerHelp(self, self.help(self) + fmt + '\n')
         self.commands.append(cmdf)
+
+
+    def registerSelfCommands(self):
+        command_names = iter([method_name for method_name in dir(self) if callable(getattr(self, method_name))])
+        command_names = filter(lambda method_name: type(getattr(self, method_name)) != type, command_names)
+        command_names = filter(lambda method_name: not method_name.startswith('_'), command_names)
+        command_names = filter(lambda method_name: method_name not in
+                                                   ['fmt', 'get', 'cmds', 'registerCommand', 'registerFmt',
+                                                    'registerHelp', 'registerModule', 'registerSelfCommands'],
+                               command_names)
+
+        for command_name in command_names:
+            command_func = getattr(self, command_name)
+
+            # build the command signature
+            command_signature = '{}('.format(command_name)
+            param_names = command_func.func_code.co_varnames
+            param_names = filter(lambda p: p != 'self', iter(param_names))
+            for param in param_names:
+                command_signature += '{}, '.format(param)
+            if command_signature.endswith(', '):
+                command_signature = command_signature[:-len(', ')]
+            command_signature += ')'
+
+            # get the first line in the documentation of the function, if available
+            doc = command_func.__doc__
+            if doc == None:
+                doc = ''
+            else:
+                doc_lines = doc.split('\n')
+                if len(doc_lines) > 1:
+                    doc = doc_lines[1]
+                else:
+                    doc = ''
+
+            def tabulate(s, n):
+                if len(s) >= n:
+                    return s + '\t\t'
+                return s + ' ' * (n - len(s)) + '\t\t'
+
+            self.registerCommand(command_func,'{sig}{help}'.format(sig=tabulate(command_signature, 70), help=doc))
+
 
     def cmds(self):
         output = []
@@ -88,6 +131,7 @@ class TerminalModule:
     @staticmethod
     def help(unit):
         """
+        gets the docs of a command or module
         :param unit: a command or a module
         :return: the docs for that command or module
         """

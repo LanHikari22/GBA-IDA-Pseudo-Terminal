@@ -35,7 +35,8 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
             self.registerModule(self.fix)
             self.registerModule(self.misc)
             self._initialized = True
-        except Exception:
+        except Exception as e:
+            print(e)
             self._initialized = False
 
     @staticmethod
@@ -96,14 +97,38 @@ class PseudoTerminal(TerminalModule.TerminalModule, object):
             else:
                 Environment.env[key] = None
 
-
-if __name__ == '__main__':
+def main():
     # ida caches source. In active development, this forces it to re-read source
-    import __init__
-    __init__.require_project()
+    import os
+    import sys
+    if os.getcwd() not in sys.path: sys.path.append(os.getcwd())
 
+    import idaapi
+    import Definitions, DisasmTools, FixTools, IDAItems, MiscTools, SrchTools
+
+    def require_project():
+        Definitions.require_package()
+        DisasmTools.require_package()
+        FixTools.require_package()
+        IDAItems.require_package()
+        MiscTools.require_package()
+        SrchTools.require_package()
+
+    import imp
+    require_project()
+
+    # if environment_path:
+    #     environment = imp.load_source('environment', environment_path)
+    #     environment = environment.MyClass()
+
+    global pt
     pt = PseudoTerminal()
     if pt._initialized:
         pt.echo("PseudoTerminal, ready for combat!")
     else:
         print('Initalized Environment to Default')
+
+
+if __name__ == '__main__':
+    main()
+
