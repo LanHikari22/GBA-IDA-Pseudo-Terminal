@@ -310,7 +310,7 @@ class Function:
         # disassemble all items within the function
         while ea < self.func_ea + self.getSize(withPool=True):
             d = Data.Data(ea)
-            disasm += d.getFormattedDisasm() + "\n"
+            disasm += d.getFormattedDisasm(start_ea, end_ea) + "\n"
             # advance to next item
             ea = ea + d.getSize()
 

@@ -66,7 +66,7 @@ class TerminalModule:
             command_signature += ')'
 
             # get the first line in the documentation of the function, if available
-            doc = command_func.__doc__
+            doc = command_func.__doc__.strip()
             if doc == None:
                 doc = ''
             else:

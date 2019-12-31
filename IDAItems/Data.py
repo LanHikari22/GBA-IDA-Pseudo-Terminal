@@ -42,7 +42,7 @@ class Data:
         """
         :return: (str) The disassembly, compatible with arm-none-eabi-gcc
         """
-        return self.getFormattedDisasm()
+        return self.getFormattedDisasm(self.ea, self.ea + self.getSize())
 
 
     def getName(self):
@@ -195,6 +195,21 @@ class Data:
 
         return output
 
+    def isGlobal(self, start_ea, end_ea):
+        """
+        Determines whether there are uses of the function outside the specified range.
+        :param start_ea: start range of the hypothetical file this belongs to
+        :param end_ea: end range of the hypothetical file
+        :return: True if xrefsFrom outside the range exist
+        """
+        crefs, drefs = self.getXRefsTo()
+        xrefs = crefs + drefs
+        for xref in xrefs:
+            if not (start_ea <= xref < end_ea):
+                return True # global
+        return False # local
+
+
     def withinFunction(self):
         return idc.get_func_flags(self.ea) != -1
 
@@ -331,20 +346,20 @@ class Data:
         # disasm = self._convertTabs(disasm)
         return disasm
 
-    def getFormattedDisasm(self, file_range):
+    def getFormattedDisasm(self, start_ea, end_ea):
         """
         puts together the name label, comment, and disassembly, as well as proper spacing
+        :params (start_ea, end_ea): file range to determine if global or not
         :return:
         """
         name = self.getName()
         disasm = ''
         # include label
         if name:
-            if self.isGlobal(file_range):
+            if self.isGlobal(start_ea, end_ea):
                 disasm = name + '::'
             else:
                 disasm = name + ':'
-            disasm = name + ':'
             # only add a new line for code labels
             if self.isCode():
                 disasm += "\n"

@@ -405,7 +405,7 @@ class GNUDisassembler:
             else:
                 d = Data.Data(ea)
                 if debug: print("%07X: disass data %s @ %07X" % (ea, d.getName(), d.ea))
-                disasm += d.getFormattedDisasm() + "\n"
+                disasm += d.getFormattedDisasm(start_ea, end_ea) + "\n"
                 ea = ea + d.getSize()
 
         # add comment for debugging purposes
